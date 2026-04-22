@@ -1,9 +1,11 @@
 import { MODULE_ID, SOCKET_NAME, MSG } from './socket-protocol.js';
-import { registerSettings } from './settings.js';
+import { registerSettings, getVttUserId } from './settings.js';
 import { registerSceneControls } from './gm-toolbar.js';
 import { handleIncomingViewport } from './viewport-controller.js';
 import {
   handleIncomingViewbox,
+  handleClientHello,
+  announceClientAspect,
   onCanvasReady as onViewboxCanvasReady,
   onCanvasTeardown as onViewboxCanvasTeardown
 } from './viewbox-controller.js';
@@ -19,12 +21,25 @@ Hooks.once('ready', () => {
 
   game.socket.on(SOCKET_NAME, (msg) => {
     try {
-      if (msg.type === MSG.VIEWPORT_SYNC) handleIncomingViewport(msg);
-      else if (msg.type === MSG.VIEWBOX_UPDATE || msg.type === MSG.VIEWBOX_CLEAR) handleIncomingViewbox(msg);
+      switch (msg.type) {
+        case MSG.VIEWPORT_SYNC:
+          handleIncomingViewport(msg); break;
+        case MSG.VIEWBOX_UPDATE:
+        case MSG.VIEWBOX_CLEAR:
+          handleIncomingViewbox(msg); break;
+        case MSG.CLIENT_HELLO:
+          handleClientHello(msg); break;
+      }
     } catch (e) {
       console.error(`[${MODULE_ID}] socket handler error`, e);
     }
   });
+
+  // If this user is the designated VTT user, announce aspect to GM
+  if (!game.user.isGM && game.user.id === getVttUserId()) {
+    announceClientAspect();
+    window.addEventListener('resize', () => announceClientAspect());
+  }
 });
 
 Hooks.on('canvasReady', () => {

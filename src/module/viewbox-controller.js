@@ -3,20 +3,19 @@ import { getVttUserId } from './settings.js';
 import { ViewboxOverlay } from './viewbox-overlay.js';
 
 const FLAG_KEY = 'viewbox';
+const FALLBACK_ASPECT = 16 / 9;
 
 let overlay = null;
 let enabled = false;
+let vttAspect = FALLBACK_ASPECT;
 
-function log(...args) {
-  console.log(`[${MODULE_ID}]`, ...args);
-}
+function log(...args) { console.log(`[${MODULE_ID}]`, ...args); }
 
 function defaultViewbox(scene) {
   const sw = scene?.dimensions?.width ?? scene?.width ?? 4000;
   const sh = scene?.dimensions?.height ?? scene?.height ?? 3000;
   const w = Math.round(sw * 0.5);
-  // Default to 16:9 aspect
-  const h = Math.round(w * (9 / 16));
+  const h = Math.round(w / vttAspect);
   return {
     x: Math.round(sw / 2),
     y: Math.round(sh / 2),
@@ -26,9 +25,7 @@ function defaultViewbox(scene) {
 }
 
 function readFlag() {
-  const scene = canvas?.scene;
-  if (!scene) return null;
-  return scene.getFlag(MODULE_ID, FLAG_KEY) ?? null;
+  return canvas?.scene?.getFlag(MODULE_ID, FLAG_KEY) ?? null;
 }
 
 async function writeFlag(data) {
@@ -45,9 +42,8 @@ function broadcastCurrent() {
   if (!overlay) return;
   const targetUserId = getVttUserId();
   if (!targetUserId) return;
-  const scene = canvas?.scene;
   emit(MSG.VIEWBOX_UPDATE, {
-    sceneId: scene?.id ?? null,
+    sceneId: canvas?.scene?.id ?? null,
     targetUserId,
     ...overlay.getState()
   });
@@ -59,9 +55,19 @@ function broadcastClear() {
   emit(MSG.VIEWBOX_CLEAR, { targetUserId });
 }
 
-export function isEnabled() {
-  return enabled;
+async function createOverlay(initial) {
+  overlay = new ViewboxOverlay({
+    ...initial,
+    aspect: vttAspect,
+    onChange: async (next) => {
+      await writeFlag(next);
+      broadcastCurrent();
+    }
+  });
+  canvas.stage.addChild(overlay);
 }
+
+export function isEnabled() { return enabled; }
 
 export async function enableViewbox() {
   if (enabled) return;
@@ -71,16 +77,7 @@ export async function enableViewbox() {
 
   const stored = readFlag();
   const data = stored ?? defaultViewbox(scene);
-
-  overlay = new ViewboxOverlay({
-    ...data,
-    onChange: async (next) => {
-      await writeFlag(next);
-      broadcastCurrent();
-    }
-  });
-  canvas.stage.addChild(overlay);
-
+  await createOverlay(data);
   enabled = true;
   if (!stored) await writeFlag(data);
   broadcastCurrent();
@@ -104,7 +101,6 @@ export async function toggleViewbox() {
   else await enableViewbox();
 }
 
-/** Called on scene change — tear down the overlay; toolbar state persists. */
 export function onCanvasTeardown() {
   if (!overlay) return;
   try {
@@ -112,30 +108,43 @@ export function onCanvasTeardown() {
     overlay.destroy();
   } catch (_) {}
   overlay = null;
-  // Keep `enabled` flag — auto re-create on canvasReady if user had it on
 }
 
 export async function onCanvasReady() {
-  if (!enabled) return; // user hasn't toggled on
+  if (!enabled) return;
   if (!game.user.isGM) return;
-  // Re-create overlay for the new scene
   const scene = canvas.scene;
   if (!scene) return;
   const stored = readFlag();
   const data = stored ?? defaultViewbox(scene);
-  overlay = new ViewboxOverlay({
-    ...data,
-    onChange: async (next) => {
-      await writeFlag(next);
-      broadcastCurrent();
-    }
-  });
-  canvas.stage.addChild(overlay);
+  await createOverlay(data);
   if (!stored) await writeFlag(data);
   broadcastCurrent();
 }
 
-/** VTT-side: apply incoming viewbox as pan+scale. */
+/** VTT client sends its window aspect on ready. GM stores it for viewbox sizing. */
+export function announceClientAspect() {
+  emit(MSG.CLIENT_HELLO, {
+    userId: game.user.id,
+    aspect: window.innerWidth / window.innerHeight,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight
+  });
+}
+
+/** GM-side: receive VTT's aspect. */
+export function handleClientHello(msg) {
+  if (!game.user.isGM) return;
+  const { payload } = msg;
+  if (!payload?.userId || payload.userId !== getVttUserId()) return;
+  const aspect = payload.aspect;
+  if (!aspect || !isFinite(aspect) || aspect <= 0) return;
+  vttAspect = aspect;
+  log(`VTT aspect received: ${aspect.toFixed(3)} (${payload.innerWidth}×${payload.innerHeight})`);
+  if (overlay) overlay.setAspect(aspect);
+}
+
+/** VTT-side: apply incoming viewbox as pan+scale. Uses MAX scale so viewbox fills screen. */
 export function handleIncomingViewbox(msg) {
   const { type, payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
@@ -144,7 +153,8 @@ export function handleIncomingViewbox(msg) {
 
   if (type === MSG.VIEWBOX_UPDATE) {
     if (payload.sceneId && canvas.scene?.id !== payload.sceneId) return;
-    const scale = Math.min(
+    // Max → viewbox just fits screen; aspect lock on GM side ensures no cropping
+    const scale = Math.max(
       window.innerWidth / payload.width,
       window.innerHeight / payload.height
     );
@@ -155,7 +165,6 @@ export function handleIncomingViewbox(msg) {
       duration: 250
     }).catch((e) => console.warn(`[${MODULE_ID}] animatePan failed`, e));
   } else if (type === MSG.VIEWBOX_CLEAR) {
-    // No-op for now — VTT keeps its last framed view.
     log('Viewbox cleared by GM');
   }
 }

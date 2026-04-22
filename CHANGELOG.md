@@ -2,6 +2,19 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.2.1] — 2026-04-22
+
+### Fixed
+
+- Viewbox move/resize interaction now works — switched to `canvas.stage.toLocal()` for coord conversion and `globalpointermove` for drag tracking.
+- Sync button no longer triggers the `onClick` deprecation warning (V13 uses `onChange`).
+- **VTT viewport now matches viewbox exactly.** The viewbox aspect ratio is locked to the VTT client's actual screen aspect (announced via a new `client.hello` handshake on ready and on window resize). VTT uses `max` scale so the viewbox fills the screen with no extra visible area.
+
+### Changed
+
+- Move/resize handles redesigned: left-click-drag anywhere on the box to move; bottom-right circle with diagonal-arrow icon to resize. Only one handle now.
+- VTT client announces its window aspect + dimensions to the GM via `client.hello`.
+
 ## [0.2.0] — 2026-04-22
 
 ### Added

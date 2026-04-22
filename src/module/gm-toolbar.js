@@ -32,7 +32,7 @@ export function registerSceneControls() {
           title: t('TABLE_MODE.Controls.SyncOnce'),
           icon: 'fas fa-crosshairs',
           button: true,
-          onClick: () => syncOnce()
+          onChange: () => syncOnce()
         }
       }
     };
