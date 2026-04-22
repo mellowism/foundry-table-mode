@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.8] — 2026-04-22
+
+### Fixed
+
+- **Heading-anchor sidebars:** journals containing pages with multiple H2/H3 sections show each heading as its own sidebar entry. Previously we sent a heading's id as if it were a page id (which failed — headings aren't pages). Now we resolve `{pageId, anchor}` from the sheet's TOC (`_pages[pageIndex]`) and pass the anchor to `goToPage(pageId, anchor)` on VTT so it scrolls to the right section.
+
+### Socket protocol
+
+- `journal.open` payload adds optional `anchor` field.
+
 ## [0.4.7] — 2026-04-22
 
 ### Fixed

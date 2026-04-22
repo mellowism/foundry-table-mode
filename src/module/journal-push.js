@@ -20,21 +20,54 @@ function asJournal(app) {
   return doc?.documentName === 'JournalEntry' ? doc : null;
 }
 
-/** Pages in the order the UI displays (by sort field), not creation order. */
 function sortedPages(doc) {
   return [...(doc?.pages?.contents ?? [])].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
 }
 
-function currentPageId(app) {
-  if (!app) return null;
-  // Prefer explicit id properties when available
-  if (app._pages?.current?.id) return app._pages.current.id;
-  if (app._pageId) return app._pageId;
-  if (app.pageId) return app.pageId;
-  // Otherwise use pageIndex against SORTED pages (UI order)
+/**
+ * Resolve the currently-displayed { pageId, anchor } on a V13 journal sheet.
+ * The sheet sidebar can include both pages AND heading-anchors within pages.
+ * `app.pageIndex` indexes into `app._pages` (TOC entries), not document.pages.
+ */
+function currentPageInfo(app) {
+  const empty = { pageId: null, anchor: null };
+  if (!app) return empty;
+
+  // V13 pattern: _pages is array of TOC entries with {pageId, anchor, ...}
+  if (Array.isArray(app._pages) && Number.isInteger(app.pageIndex)) {
+    const entry = app._pages[app.pageIndex];
+    if (entry) {
+      const pageId = entry.pageId ?? entry.id;
+      if (pageId && app.document?.pages?.get(pageId)) {
+        return { pageId, anchor: entry.anchor ?? null };
+      }
+    }
+  }
+
+  // Some sheets expose _pages as keyed object (alt V13 variant)
+  if (app._pages && typeof app._pages === 'object' && !Array.isArray(app._pages)) {
+    const current = app._pages.current ?? null;
+    if (current) {
+      const pageId = current.pageId ?? current.id;
+      if (pageId && app.document?.pages?.get(pageId)) {
+        return { pageId, anchor: current.anchor ?? null };
+      }
+    }
+  }
+
+  // Direct properties (older or other variants)
+  const directId = app.pageId ?? app._pageId;
+  if (directId && app.document?.pages?.get(directId)) {
+    return { pageId: directId, anchor: null };
+  }
+
+  // pageIndex against sorted document.pages (best-effort fallback)
   const pages = sortedPages(app.document);
-  if (app.pageIndex != null && pages[app.pageIndex]) return pages[app.pageIndex].id;
-  return pages[0]?.id ?? null;
+  if (Number.isInteger(app.pageIndex) && pages[app.pageIndex]) {
+    return { pageId: pages[app.pageIndex].id, anchor: null };
+  }
+
+  return { pageId: pages[0]?.id ?? null, anchor: null };
 }
 
 const OBSERVER = 2; // CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
@@ -65,7 +98,7 @@ async function revertOwnership(journal, userId, prev) {
   }
 }
 
-export async function toggleJournalOnVtt(journalId, pageId) {
+export async function toggleJournalOnVtt(journalId, pageId, anchor) {
   if (!game.user.isGM) return;
   const targetUserId = getVttUserId();
   if (!targetUserId) {
@@ -76,7 +109,6 @@ export async function toggleJournalOnVtt(journalId, pageId) {
   if (!journal) return;
 
   if (openOnVtt.has(journalId)) {
-    // Close on VTT
     const state = openOnVtt.get(journalId);
     emit(MSG.JOURNAL_CLOSE, { journalId, targetUserId });
     openOnVtt.delete(journalId);
@@ -85,15 +117,14 @@ export async function toggleJournalOnVtt(journalId, pageId) {
     }
     log('Hide on VTT →', journalId);
   } else {
-    // Elevate permission first (awaits broadcast)
     const elevation = await elevateOwnership(journal, targetUserId);
-    emit(MSG.JOURNAL_OPEN, { journalId, pageId, targetUserId });
+    emit(MSG.JOURNAL_OPEN, { journalId, pageId, anchor, targetUserId });
     openOnVtt.set(journalId, {
-      pageId,
+      pageId, anchor,
       elevated: elevation.changed,
       prevOwnership: elevation.prev
     });
-    log('Show on VTT →', journalId, pageId ?? '(default)');
+    log('Show on VTT →', journalId, pageId ?? '(default)', anchor ? `#${anchor}` : '');
   }
   refreshButtonsFor(journalId);
 }
@@ -132,7 +163,8 @@ export function onRenderJournalSheet(app, html) {
   btn.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
-    toggleJournalOnVtt(doc.id, currentPageId(app));
+    const { pageId, anchor } = currentPageInfo(app);
+    toggleJournalOnVtt(doc.id, pageId, anchor);
   });
 
   const closeBtn = header.querySelector('.header-control[data-action="close"], .close, [data-tooltip="Close"]');
@@ -197,17 +229,14 @@ export async function handleJournalOpen(msg) {
     vttOpenApps.set(payload.journalId, sheet);
 
     if (payload.pageId && typeof sheet.goToPage === 'function') {
-      // Navigate after the render has initialized
-      setTimeout(() => {
-        try { sheet.goToPage(payload.pageId); } catch (_) {}
-      }, 150);
-      setTimeout(() => {
-        // Retry once in case the first goToPage fired before the TOC was ready
-        try { sheet.goToPage(payload.pageId); } catch (_) {}
-      }, 500);
+      const nav = () => {
+        try { sheet.goToPage(payload.pageId, payload.anchor ?? undefined); } catch (_) {}
+      };
+      setTimeout(nav, 150);
+      setTimeout(nav, 500);
     }
 
-    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)');
+    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', payload.anchor ? `#${payload.anchor}` : '');
   } catch (e) {
     console.warn(`[${MODULE_ID}] failed to open journal`, e);
   }
