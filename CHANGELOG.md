@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.1.1] — 2026-04-22
+
+### Fixed
+
+- VTT User dropdown in module settings was empty — settings are now registered on the `ready` hook (when `game.users` is populated) instead of `init`.
+
 ## [0.1.0] — 2026-04-22
 
 ### Added
