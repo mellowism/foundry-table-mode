@@ -2,6 +2,19 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.2.0] — 2026-04-22
+
+### Added
+
+- **Viewbox** — draggable rectangle on the GM canvas defining exactly what the VTT client frames. Toggle from the Table Mode toolbar.
+- Move handle (top-left) and resize handle (bottom-right) on the viewbox.
+- Viewbox state persists as a scene flag — each scene remembers its viewbox.
+- VTT client auto-computes pan/zoom from viewbox dimensions vs its own window size.
+
+### Socket protocol
+
+- Added `viewbox.update` and `viewbox.clear` message types.
+
 ## [0.1.4] — 2026-04-22
 
 ### Fixed
