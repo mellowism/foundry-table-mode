@@ -1,10 +1,10 @@
 import { MODULE_ID, SOCKET_NAME, MSG } from './socket-protocol.js';
 import { getVttUserId } from './settings.js';
 
-/** GM-side: Map<journalId, { pageId? }> for journals currently open on VTT */
+/** GM-side: Map<journalId, { pageId?, prevOwnership? }> */
 const openOnVtt = new Map();
 
-/** VTT-side: map journalId → opened Application instance so we can close it. */
+/** VTT-side: Map<journalId, Application> */
 const vttOpenApps = new Map();
 
 function log(...args) { console.log(`[${MODULE_ID}]`, ...args); }
@@ -20,7 +20,6 @@ function asJournal(app) {
   return doc?.documentName === 'JournalEntry' ? doc : null;
 }
 
-/** Resolve the currently-displayed page id on a GM journal sheet. */
 function currentPageId(app) {
   if (!app) return null;
   const pages = app.document?.pages?.contents ?? [];
@@ -29,6 +28,34 @@ function currentPageId(app) {
   if (app._pageId) return app._pageId;
   if (app.pageId) return app.pageId;
   return pages[0]?.id ?? null;
+}
+
+const OBSERVER = 2; // CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
+
+async function elevateOwnership(journal, userId) {
+  const ownership = journal.ownership ?? {};
+  const explicit = ownership[userId];
+  const effective = explicit ?? ownership.default ?? 0;
+  if (effective >= OBSERVER) return { changed: false };
+  await journal.update({ [`ownership.${userId}`]: OBSERVER });
+  log(`Elevated ${userId} to Observer on journal ${journal.id} (was ${explicit ?? 'inherit'})`);
+  return { changed: true, prev: explicit }; // prev is the explicit value (may be undefined)
+}
+
+async function revertOwnership(journal, userId, prev) {
+  const update = {};
+  if (prev === undefined) {
+    // Remove explicit entry — revert to inherited default
+    update[`ownership.-=${userId}`] = null;
+  } else {
+    update[`ownership.${userId}`] = prev;
+  }
+  try {
+    await journal.update(update);
+    log(`Reverted ownership for ${userId} on journal ${journal.id}`);
+  } catch (e) {
+    console.warn(`[${MODULE_ID}] revertOwnership failed`, e);
+  }
 }
 
 export async function toggleJournalOnVtt(journalId, pageId) {
@@ -42,30 +69,24 @@ export async function toggleJournalOnVtt(journalId, pageId) {
   if (!journal) return;
 
   if (openOnVtt.has(journalId)) {
-    // Close on VTT via our socket
+    // Close on VTT
+    const state = openOnVtt.get(journalId);
     emit(MSG.JOURNAL_CLOSE, { journalId, targetUserId });
     openOnVtt.delete(journalId);
+    if (state.elevated) {
+      await revertOwnership(journal, targetUserId, state.prevOwnership);
+    }
     log('Hide on VTT →', journalId);
   } else {
-    // Use Foundry core's built-in "Show to Players" mechanism.
-    // It handles permission elevation and rendering across clients correctly,
-    // and avoids the dnd5e JournalEntrySheet5e render crash on limited pages.
-    try {
-      const opts = { force: true, users: [targetUserId] };
-      if (pageId) opts.pageId = pageId;
-      await journal.show(opts);
-    } catch (e1) {
-      try {
-        // Fallback: positional users, options second arg
-        await journal.show([targetUserId], pageId ? { pageId, force: true } : { force: true });
-      } catch (e2) {
-        console.warn(`[${MODULE_ID}] journal.show failed`, e1, e2);
-        ui.notifications.warn('Failed to show journal on VTT (check console)');
-        return;
-      }
-    }
-    openOnVtt.set(journalId, { pageId });
-    log('Show on VTT →', journalId, pageId ?? '(default page)');
+    // Elevate permission first (awaits broadcast)
+    const elevation = await elevateOwnership(journal, targetUserId);
+    emit(MSG.JOURNAL_OPEN, { journalId, pageId, targetUserId });
+    openOnVtt.set(journalId, {
+      pageId,
+      elevated: elevation.changed,
+      prevOwnership: elevation.prev
+    });
+    log('Show on VTT →', journalId, pageId ?? '(default)');
   }
   refreshButtonsFor(journalId);
 }
@@ -79,7 +100,6 @@ function refreshButtonsFor(journalId) {
   }
 }
 
-/** Called by hook when any journal sheet renders. GM-side button. */
 export function onRenderJournalSheet(app, html) {
   if (!game.user.isGM) return;
   const doc = asJournal(app);
@@ -113,33 +133,17 @@ export function onRenderJournalSheet(app, html) {
   else header.appendChild(btn);
 }
 
-/** VTT-side: journal was closed (either via command or user action). Notify GM. */
 export function onVttJournalClose(app) {
   if (game.user.isGM) return;
   if (game.user.id !== getVttUserId()) return;
   const doc = asJournal(app);
   if (!doc) return;
-  if (!vttOpenApps.has(doc.id)) return; // Not ours; ignore
+  if (!vttOpenApps.has(doc.id)) return;
   vttOpenApps.delete(doc.id);
   emit(MSG.JOURNAL_STATE, { journalId: doc.id, open: false });
-  log('VTT closed journal manually, notified GM', doc.id);
+  log('VTT closed journal manually', doc.id);
 }
 
-/** GM-side: receive state update from VTT. */
-export function handleJournalState(msg) {
-  if (!game.user.isGM) return;
-  const { payload, senderId } = msg;
-  if (senderId === game.user.id) return;
-  if (payload.open === false) {
-    if (openOnVtt.has(payload.journalId)) {
-      openOnVtt.delete(payload.journalId);
-      refreshButtonsFor(payload.journalId);
-      log('VTT reported journal closed', payload.journalId);
-    }
-  }
-}
-
-/** Track VTT-side open state when Foundry core's show() mechanism renders the sheet. */
 export function onVttJournalRender(app) {
   if (game.user.isGM) return;
   if (game.user.id !== getVttUserId()) return;
@@ -148,9 +152,56 @@ export function onVttJournalRender(app) {
   vttOpenApps.set(doc.id, app);
 }
 
-/** Deprecated — kept only for backwards compat with older GMs that may still send this message. */
-export function handleJournalOpen(msg) {
-  log('Ignoring legacy journal.open message (v0.4.3+ uses core show())');
+export async function handleJournalState(msg) {
+  if (!game.user.isGM) return;
+  const { payload, senderId } = msg;
+  if (senderId === game.user.id) return;
+  if (payload.open !== false) return;
+  const state = openOnVtt.get(payload.journalId);
+  if (!state) return;
+  openOnVtt.delete(payload.journalId);
+  refreshButtonsFor(payload.journalId);
+  // Revert permission if we elevated
+  if (state.elevated) {
+    const journal = game.journal?.get(payload.journalId);
+    if (journal) await revertOwnership(journal, getVttUserId(), state.prevOwnership);
+  }
+  log('VTT reported journal closed', payload.journalId);
+}
+
+export async function handleJournalOpen(msg) {
+  const { payload, senderId } = msg;
+  if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
+  if (senderId === game.user.id) return;
+
+  // Give the ownership update a moment to land if it's still in-flight
+  const journal = game.journal?.get(payload.journalId);
+  if (!journal) return;
+
+  try {
+    const sheet = journal.sheet;
+    const pages = journal.pages?.contents ?? [];
+    const pageIdx = payload.pageId ? pages.findIndex(p => p.id === payload.pageId) : 0;
+
+    // Render in single-page mode. JournalSheet.VIEW_MODES: 1=single, 2=multiple.
+    const opts = { mode: 1 };
+    if (pageIdx >= 0) opts.pageIndex = pageIdx;
+    if (payload.pageId) opts.pageId = payload.pageId;
+
+    sheet.render(true, opts);
+    vttOpenApps.set(payload.journalId, sheet);
+
+    // If a page was requested, navigate explicitly after render
+    if (payload.pageId && typeof sheet.goToPage === 'function') {
+      setTimeout(() => {
+        try { sheet.goToPage(payload.pageId); } catch (_) {}
+      }, 100);
+    }
+
+    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', 'idx=', pageIdx);
+  } catch (e) {
+    console.warn(`[${MODULE_ID}] failed to open journal`, e);
+  }
 }
 
 export function handleJournalClose(msg) {

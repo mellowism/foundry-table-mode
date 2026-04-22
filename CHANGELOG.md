@@ -2,6 +2,17 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.4] — 2026-04-22
+
+### Fixed
+
+- **Journal push now renders in single-page mode** at the requested page (was rendering all-pages scrollable mode via `journal.show()`).
+- **Permission-induced dnd5e crash avoided via targeted elevation.** GM-side temporarily grants the VTT user Observer permission on the journal, then reverts the explicit entry back to inherited default on close. This handles the original dnd5e 5.3 crash without the display-mode side effects of `journal.show()`.
+
+### Changed
+
+- Rolled back to custom socket for open (v0.4.3 used `journal.show()`). Custom socket gives full control over render options (mode, pageIndex, pageId).
+
 ## [0.4.3] — 2026-04-22
 
 ### Fixed
