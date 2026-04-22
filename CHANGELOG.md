@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.7] — 2026-04-22
+
+### Fixed
+
+- Page navigation no longer passes `pageIndex` to `render()`. Sheet subclasses (core, dnd5e, MEJ) interpret pageIndex inconsistently — some use sort-order, others creation-order. Now relies on `pageId` + `goToPage()` exclusively, with a second `goToPage` after 500ms as a safety retry for journals with deferred TOC initialization.
+
 ## [0.4.6] — 2026-04-22
 
 ### Fixed

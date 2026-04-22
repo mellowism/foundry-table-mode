@@ -187,25 +187,27 @@ export async function handleJournalOpen(msg) {
 
   try {
     const sheet = journal.sheet;
-    const pages = sortedPages(journal);
-    const pageIdx = payload.pageId ? pages.findIndex(p => p.id === payload.pageId) : 0;
 
-    // Render in single-page mode. JournalSheet.VIEW_MODES: 1=single, 2=multiple.
+    // Render in single-page mode. Do NOT pass pageIndex — subclasses interpret it inconsistently
+    // (sort-order vs creation-order). Rely on pageId + goToPage instead.
     const opts = { mode: 1 };
-    if (pageIdx >= 0) opts.pageIndex = pageIdx;
     if (payload.pageId) opts.pageId = payload.pageId;
 
     sheet.render(true, opts);
     vttOpenApps.set(payload.journalId, sheet);
 
-    // If a page was requested, navigate explicitly after render
     if (payload.pageId && typeof sheet.goToPage === 'function') {
+      // Navigate after the render has initialized
       setTimeout(() => {
         try { sheet.goToPage(payload.pageId); } catch (_) {}
-      }, 100);
+      }, 150);
+      setTimeout(() => {
+        // Retry once in case the first goToPage fired before the TOC was ready
+        try { sheet.goToPage(payload.pageId); } catch (_) {}
+      }, 500);
     }
 
-    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', 'idx=', pageIdx);
+    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)');
   } catch (e) {
     console.warn(`[${MODULE_ID}] failed to open journal`, e);
   }
