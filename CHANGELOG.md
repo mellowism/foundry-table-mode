@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.6] — 2026-04-22
+
+### Fixed
+
+- **Wrong page displayed on VTT** when the journal had pages that had been reordered. `app.pageIndex` indexes into the UI's sort-order, but `journal.pages.contents` is in creation order — mismatch caused off-by-one (or more) errors. Both GM-side resolve and VTT-side lookup now use a sort-aware `sortedPages()` helper.
+
 ## [0.4.5] — 2026-04-22
 
 ### Changed

@@ -20,13 +20,20 @@ function asJournal(app) {
   return doc?.documentName === 'JournalEntry' ? doc : null;
 }
 
+/** Pages in the order the UI displays (by sort field), not creation order. */
+function sortedPages(doc) {
+  return [...(doc?.pages?.contents ?? [])].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+}
+
 function currentPageId(app) {
   if (!app) return null;
-  const pages = app.document?.pages?.contents ?? [];
-  if (app.pageIndex != null && pages[app.pageIndex]) return pages[app.pageIndex].id;
+  // Prefer explicit id properties when available
   if (app._pages?.current?.id) return app._pages.current.id;
   if (app._pageId) return app._pageId;
   if (app.pageId) return app.pageId;
+  // Otherwise use pageIndex against SORTED pages (UI order)
+  const pages = sortedPages(app.document);
+  if (app.pageIndex != null && pages[app.pageIndex]) return pages[app.pageIndex].id;
   return pages[0]?.id ?? null;
 }
 
@@ -180,7 +187,7 @@ export async function handleJournalOpen(msg) {
 
   try {
     const sheet = journal.sheet;
-    const pages = journal.pages?.contents ?? [];
+    const pages = sortedPages(journal);
     const pageIdx = payload.pageId ? pages.findIndex(p => p.id === payload.pageId) : 0;
 
     // Render in single-page mode. JournalSheet.VIEW_MODES: 1=single, 2=multiple.
