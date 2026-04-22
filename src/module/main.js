@@ -14,8 +14,10 @@ import { applyUiCleanup } from './vtt-ui-cleanup.js';
 import { handleIncomingReload } from './client-actions.js';
 import {
   onRenderJournalSheet,
+  onVttJournalClose,
   handleJournalOpen,
-  handleJournalClose
+  handleJournalClose,
+  handleJournalState
 } from './journal-push.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
@@ -45,6 +47,8 @@ Hooks.once('ready', () => {
           handleJournalOpen(msg); break;
         case MSG.JOURNAL_CLOSE:
           handleJournalClose(msg); break;
+        case MSG.JOURNAL_STATE:
+          handleJournalState(msg); break;
       }
     } catch (e) {
       console.error(`[${MODULE_ID}] socket handler error`, e);
@@ -71,6 +75,10 @@ Hooks.on('updateSetting', (setting) => {
 Hooks.on('renderJournalSheet', onRenderJournalSheet);
 Hooks.on('renderJournalEntrySheet', onRenderJournalSheet);
 Hooks.on('renderJournalPageSheet', onRenderJournalSheet);
+
+// VTT-side: detect user-initiated close so we can notify GM
+Hooks.on('closeJournalSheet', onVttJournalClose);
+Hooks.on('closeJournalEntrySheet', onVttJournalClose);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));

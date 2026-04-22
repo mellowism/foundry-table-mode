@@ -2,6 +2,21 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.1] — 2026-04-22
+
+### Added
+
+- **Page-specific push:** when pushing a multi-page journal, the currently-displayed page on the GM is opened on VTT (not just the default page).
+- **State sync:** if the VTT user manually closes a pushed journal (Escape / X), the GM button reverts to its "Show on VTT" state.
+
+### Changed
+
+- Tooltip wording: "Show on VTT" / "Hide on VTT" (was "Open / Close").
+
+### Socket protocol
+
+- Added `journal.state` message (VTT → GM close notification).
+
 ## [0.4.0] — 2026-04-22
 
 ### Added — Journal push/close toggle

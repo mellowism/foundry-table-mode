@@ -14,6 +14,6 @@
   "TABLE_MODE.Notifications.NoVttUser": "Table Mode: no VTT user selected. Set one in module settings first.",
   "TABLE_MODE.Notifications.Synced": "Table Mode: viewport synced to VTT.",
   "TABLE_MODE.Notifications.ReloadSent": "Table Mode: reload command sent to VTT client.",
-  "TABLE_MODE.Journal.Push": "Open on VTT",
-  "TABLE_MODE.Journal.Close": "Close on VTT"
+  "TABLE_MODE.Journal.Show": "Show on VTT",
+  "TABLE_MODE.Journal.Hide": "Hide on VTT"
 }
