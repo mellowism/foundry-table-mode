@@ -13,10 +13,7 @@ import {
 import { applyUiCleanup } from './vtt-ui-cleanup.js';
 import { handleIncomingReload } from './client-actions.js';
 
-const HIDE_SETTING_KEYS = new Set([
-  'hideSidebar', 'hideChat', 'hideNavigation',
-  'hidePlayers', 'hideHotbar', 'hideControls', 'hideLogo'
-]);
+const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -58,7 +55,7 @@ Hooks.on('updateSetting', (setting) => {
   if (!key.startsWith(`${MODULE_ID}.`)) return;
   const shortKey = key.slice(`${MODULE_ID}.`.length);
   if (shortKey === 'vttAspect') applyAspectNow();
-  if (HIDE_SETTING_KEYS.has(shortKey) || shortKey === 'vttUserId') applyUiCleanup();
+  if (UI_SETTING_KEYS.has(shortKey)) applyUiCleanup();
 });
 
 Hooks.on('canvasReady', () => {

@@ -2,6 +2,17 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.3.1] — 2026-04-22
+
+### Changed
+
+- Collapsed the 7 per-element VTT UI toggles into a single **Hide VTT UI** switch. In the common-display use case, you either want a clean canvas or you don't — individual toggles added config noise without real value. Anyone needing granular control can override with custom CSS.
+- Broadened the hide selector to cover V13's actual layout: `#ui-left`, `#ui-right`, `#ui-top`, `#ui-bottom`, `#scene-controls`, `#chat-notifications`, `#pause`, etc.
+
+### Fixed
+
+- V13 UI elements now actually hide. Previous selectors (`#controls`, `#sidebar`) targeted old IDs — V13 uses `#scene-controls` and `#ui-right` wrapper. Hiding the wrapper rather than individual components fixes this.
+
 ## [0.3.0] — 2026-04-22
 
 ### Added — VTT UI cleanup
