@@ -10,6 +10,13 @@ import {
   onCanvasReady as onViewboxCanvasReady,
   onCanvasTeardown as onViewboxCanvasTeardown
 } from './viewbox-controller.js';
+import { applyUiCleanup } from './vtt-ui-cleanup.js';
+import { handleIncomingReload } from './client-actions.js';
+
+const HIDE_SETTING_KEYS = new Set([
+  'hideSidebar', 'hideChat', 'hideNavigation',
+  'hidePlayers', 'hideHotbar', 'hideControls', 'hideLogo'
+]);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -30,23 +37,28 @@ Hooks.once('ready', () => {
           handleIncomingViewbox(msg); break;
         case MSG.CLIENT_HELLO:
           handleClientHello(msg); break;
+        case MSG.CLIENT_RELOAD:
+          handleIncomingReload(msg); break;
       }
     } catch (e) {
       console.error(`[${MODULE_ID}] socket handler error`, e);
     }
   });
 
-  // If this user is the designated VTT user, announce aspect to GM
   if (!game.user.isGM && game.user.id === getVttUserId()) {
     announceClientAspect();
     window.addEventListener('resize', () => announceClientAspect());
   }
+
+  applyUiCleanup();
 });
 
 Hooks.on('updateSetting', (setting) => {
-  if (setting?.key === `${MODULE_ID}.vttAspect`) {
-    applyAspectNow();
-  }
+  const key = setting?.key ?? '';
+  if (!key.startsWith(`${MODULE_ID}.`)) return;
+  const shortKey = key.slice(`${MODULE_ID}.`.length);
+  if (shortKey === 'vttAspect') applyAspectNow();
+  if (HIDE_SETTING_KEYS.has(shortKey) || shortKey === 'vttUserId') applyUiCleanup();
 });
 
 Hooks.on('canvasReady', () => {

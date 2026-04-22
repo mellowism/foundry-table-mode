@@ -2,6 +2,30 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.3.0] — 2026-04-22
+
+### Added — VTT UI cleanup
+
+Seven per-element toggles in module settings that hide UI chrome on the VTT client only (not GM or other players):
+
+- Hide VTT Sidebar
+- Hide VTT Chat
+- Hide VTT Scene Navigation
+- Hide VTT Player List
+- Hide VTT Hotbar
+- Hide VTT Scene Controls
+- Hide VTT Foundry Logo
+
+Changes apply immediately on the VTT client without reload.
+
+### Added — Reload VTT
+
+New toolbar button in the Table Mode category: **Force Reload VTT Client**. Sends a `client.reload` socket message; VTT calls `location.reload()` after a 150ms delay (lets notifications render).
+
+### Socket protocol
+
+- Added `client.reload` message type.
+
 ## [0.2.2] — 2026-04-22
 
 ### Fixed

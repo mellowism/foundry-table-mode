@@ -1,10 +1,9 @@
 import { MODULE_ID } from './socket-protocol.js';
 import { syncOnce } from './viewport-controller.js';
 import { toggleViewbox, isEnabled as isViewboxEnabled } from './viewbox-controller.js';
+import { reloadVtt } from './client-actions.js';
 
-function t(key) {
-  return game.i18n.localize(key);
-}
+function t(key) { return game.i18n.localize(key); }
 
 export function registerSceneControls() {
   Hooks.on('getSceneControlButtons', (controls) => {
@@ -33,18 +32,18 @@ export function registerSceneControls() {
           icon: 'fas fa-crosshairs',
           button: true,
           onChange: () => syncOnce()
+        },
+        reload: {
+          name: 'reload',
+          title: t('TABLE_MODE.Controls.ReloadVtt'),
+          icon: 'fas fa-sync',
+          button: true,
+          onChange: () => reloadVtt()
         }
       }
     };
 
-    if (Array.isArray(controls)) {
-      controls.push(tableControl);
-    } else {
-      controls[MODULE_ID] = tableControl;
-    }
+    if (Array.isArray(controls)) controls.push(tableControl);
+    else controls[MODULE_ID] = tableControl;
   });
-}
-
-export function refreshToolbar() {
-  ui.controls?.render?.(true);
 }
