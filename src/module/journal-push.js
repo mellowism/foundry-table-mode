@@ -20,15 +20,15 @@ function asJournal(app) {
   return doc?.documentName === 'JournalEntry' ? doc : null;
 }
 
-/** Try several V13 APIs to find the currently-displayed page id. */
+/** Resolve the currently-displayed page id on a GM journal sheet. */
 function currentPageId(app) {
   if (!app) return null;
-  return app.pageIndex != null && app.document?.pages?.contents?.[app.pageIndex]?.id
-    || app._pages?.current?.id
-    || app._pageId
-    || app.pageId
-    || app.document?.pages?.contents?.[0]?.id
-    || null;
+  const pages = app.document?.pages?.contents ?? [];
+  if (app.pageIndex != null && pages[app.pageIndex]) return pages[app.pageIndex].id;
+  if (app._pages?.current?.id) return app._pages.current.id;
+  if (app._pageId) return app._pageId;
+  if (app.pageId) return app.pageId;
+  return pages[0]?.id ?? null;
 }
 
 export function toggleJournalOnVtt(journalId, pageId) {
@@ -78,7 +78,7 @@ export function onRenderJournalSheet(app, html) {
   btn.setAttribute(`data-${MODULE_ID}-btn`, 'journal');
   btn.className = 'header-control icon fa-solid fa-tv';
   btn.style.cssText = 'background: transparent; border: none; cursor: pointer; padding: 0 6px; color: inherit; font-size: inherit;';
-  const label = isOpen ? t('TABLE_MODE.Journal.Hide') : t('TABLE_MODE.Journal.Show');
+  const label = t('TABLE_MODE.Journal.Toggle');
   btn.title = label;
   btn.setAttribute('data-tooltip', label);
   if (isOpen) btn.style.color = '#ffc107';
@@ -126,23 +126,33 @@ export function handleJournalOpen(msg) {
   if (senderId === game.user.id) return;
   const journal = game.journal?.get(payload.journalId);
   if (!journal) return;
+
   try {
     const sheet = journal.sheet;
-    sheet.render(true);
-    vttOpenApps.set(payload.journalId, sheet);
-    // Navigate to specific page if provided
-    if (payload.pageId) {
-      // Defer so render has begun
-      setTimeout(() => {
-        try {
-          if (typeof sheet.goToPage === 'function') sheet.goToPage(payload.pageId);
-          else if (typeof sheet.render === 'function') sheet.render(true, { pageId: payload.pageId });
-        } catch (e) {
-          console.warn(`[${MODULE_ID}] goToPage failed`, e);
-        }
-      }, 100);
+    const pages = journal.pages?.contents ?? [];
+    const pageIdx = payload.pageId ? pages.findIndex(p => p.id === payload.pageId) : -1;
+
+    // Pass render options so the sheet initializes with the right page
+    const opts = {};
+    if (pageIdx >= 0) {
+      opts.pageId = payload.pageId;
+      opts.pageIndex = pageIdx;
+      opts.anchor = payload.pageId;
     }
-    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)');
+
+    if (sheet.rendered) {
+      // Already open — just navigate
+      if (pageIdx >= 0 && typeof sheet.goToPage === 'function') {
+        sheet.goToPage(payload.pageId);
+      } else {
+        sheet.render(false, opts);
+      }
+    } else {
+      sheet.render(true, opts);
+    }
+
+    vttOpenApps.set(payload.journalId, sheet);
+    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', 'idx=', pageIdx);
   } catch (e) {
     console.warn(`[${MODULE_ID}] failed to open journal`, e);
   }

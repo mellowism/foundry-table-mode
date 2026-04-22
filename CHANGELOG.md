@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.2] — 2026-04-22
+
+### Fixed
+
+- Multi-page journal on VTT now shows content instead of a blank page. Page id + index are now passed as render options on the first render call (was a deferred `goToPage` that raced the sheet's own initialization).
+
+### Changed
+
+- Journal button tooltip is now a single static string: "Show / Hide on VTT". Simpler, no state-dependent update.
+
 ## [0.4.1] — 2026-04-22
 
 ### Added
