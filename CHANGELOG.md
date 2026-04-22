@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.3] — 2026-04-22
+
+### Fixed
+
+- Journal push no longer crashes when the VTT user lacks full page-level permissions. We now use Foundry core's built-in `JournalEntry.show(users, {pageId})` for the open path — core handles permission elevation and rendering, sidestepping a dnd5e 5.3 render-time crash in `JournalEntrySheet5e._onRender → getPageSheet`.
+
+### Changed
+
+- Open path now piggybacks Foundry core. Close path still uses our socket (core has no "un-show" counterpart).
+
 ## [0.4.2] — 2026-04-22
 
 ### Fixed

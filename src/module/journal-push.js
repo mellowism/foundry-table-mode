@@ -31,19 +31,39 @@ function currentPageId(app) {
   return pages[0]?.id ?? null;
 }
 
-export function toggleJournalOnVtt(journalId, pageId) {
+export async function toggleJournalOnVtt(journalId, pageId) {
   if (!game.user.isGM) return;
   const targetUserId = getVttUserId();
   if (!targetUserId) {
     ui.notifications.warn(t('TABLE_MODE.Notifications.NoVttUser'));
     return;
   }
+  const journal = game.journal?.get(journalId);
+  if (!journal) return;
+
   if (openOnVtt.has(journalId)) {
+    // Close on VTT via our socket
     emit(MSG.JOURNAL_CLOSE, { journalId, targetUserId });
     openOnVtt.delete(journalId);
     log('Hide on VTT →', journalId);
   } else {
-    emit(MSG.JOURNAL_OPEN, { journalId, pageId, targetUserId });
+    // Use Foundry core's built-in "Show to Players" mechanism.
+    // It handles permission elevation and rendering across clients correctly,
+    // and avoids the dnd5e JournalEntrySheet5e render crash on limited pages.
+    try {
+      const opts = { force: true, users: [targetUserId] };
+      if (pageId) opts.pageId = pageId;
+      await journal.show(opts);
+    } catch (e1) {
+      try {
+        // Fallback: positional users, options second arg
+        await journal.show([targetUserId], pageId ? { pageId, force: true } : { force: true });
+      } catch (e2) {
+        console.warn(`[${MODULE_ID}] journal.show failed`, e1, e2);
+        ui.notifications.warn('Failed to show journal on VTT (check console)');
+        return;
+      }
+    }
     openOnVtt.set(journalId, { pageId });
     log('Show on VTT →', journalId, pageId ?? '(default page)');
   }
@@ -119,43 +139,18 @@ export function handleJournalState(msg) {
   }
 }
 
-/** VTT-side: open journal (optionally at a specific page) */
+/** Track VTT-side open state when Foundry core's show() mechanism renders the sheet. */
+export function onVttJournalRender(app) {
+  if (game.user.isGM) return;
+  if (game.user.id !== getVttUserId()) return;
+  const doc = asJournal(app);
+  if (!doc) return;
+  vttOpenApps.set(doc.id, app);
+}
+
+/** Deprecated — kept only for backwards compat with older GMs that may still send this message. */
 export function handleJournalOpen(msg) {
-  const { payload, senderId } = msg;
-  if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
-  if (senderId === game.user.id) return;
-  const journal = game.journal?.get(payload.journalId);
-  if (!journal) return;
-
-  try {
-    const sheet = journal.sheet;
-    const pages = journal.pages?.contents ?? [];
-    const pageIdx = payload.pageId ? pages.findIndex(p => p.id === payload.pageId) : -1;
-
-    // Pass render options so the sheet initializes with the right page
-    const opts = {};
-    if (pageIdx >= 0) {
-      opts.pageId = payload.pageId;
-      opts.pageIndex = pageIdx;
-      opts.anchor = payload.pageId;
-    }
-
-    if (sheet.rendered) {
-      // Already open — just navigate
-      if (pageIdx >= 0 && typeof sheet.goToPage === 'function') {
-        sheet.goToPage(payload.pageId);
-      } else {
-        sheet.render(false, opts);
-      }
-    } else {
-      sheet.render(true, opts);
-    }
-
-    vttOpenApps.set(payload.journalId, sheet);
-    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', 'idx=', pageIdx);
-  } catch (e) {
-    console.warn(`[${MODULE_ID}] failed to open journal`, e);
-  }
+  log('Ignoring legacy journal.open message (v0.4.3+ uses core show())');
 }
 
 export function handleJournalClose(msg) {

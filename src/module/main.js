@@ -15,6 +15,7 @@ import { handleIncomingReload } from './client-actions.js';
 import {
   onRenderJournalSheet,
   onVttJournalClose,
+  onVttJournalRender,
   handleJournalOpen,
   handleJournalClose,
   handleJournalState
@@ -72,8 +73,14 @@ Hooks.on('updateSetting', (setting) => {
 });
 
 // Journal header button — inject on render. Try several hook names for V13 variants.
-Hooks.on('renderJournalSheet', onRenderJournalSheet);
-Hooks.on('renderJournalEntrySheet', onRenderJournalSheet);
+Hooks.on('renderJournalSheet', (app, html) => {
+  onRenderJournalSheet(app, html);
+  onVttJournalRender(app);
+});
+Hooks.on('renderJournalEntrySheet', (app, html) => {
+  onRenderJournalSheet(app, html);
+  onVttJournalRender(app);
+});
 Hooks.on('renderJournalPageSheet', onRenderJournalSheet);
 
 // VTT-side: detect user-initiated close so we can notify GM
