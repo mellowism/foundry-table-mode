@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.9] — 2026-04-22
+
+### Fixed
+
+- `goToPage(pageId, anchor)` was called with the wrong signature — V13 expects `goToPage(pageId, { anchor })` (options object). Anchor was silently ignored, which is why heading navigation never worked.
+
+### Changed — major simplification
+
+- **Permission elevation removed.** Now uses V13's built-in `tempOwnership: true` render option — Foundry grants observer access for the duration of the render without persisting an ownership change.
+- Render uses the canonical V13 options: `{ mode, pageId, anchor, tempOwnership }`. All navigation happens in the initial render call; a single 200ms safety retry remains as a belt for edge cases.
+- Removed: `elevateOwnership`, `revertOwnership`, state tracking for `prevOwnership`/`elevated`. ~50 lines of gymnastics replaced with one render-options flag.
+
 ## [0.4.8] — 2026-04-22
 
 ### Fixed

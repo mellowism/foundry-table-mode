@@ -1,7 +1,7 @@
 import { MODULE_ID, SOCKET_NAME, MSG } from './socket-protocol.js';
 import { getVttUserId } from './settings.js';
 
-/** GM-side: Map<journalId, { pageId?, prevOwnership? }> */
+/** GM-side: Map<journalId, { pageId?, anchor? }> — journals currently open on VTT */
 const openOnVtt = new Map();
 
 /** VTT-side: Map<journalId, Application> */
@@ -20,20 +20,15 @@ function asJournal(app) {
   return doc?.documentName === 'JournalEntry' ? doc : null;
 }
 
-function sortedPages(doc) {
-  return [...(doc?.pages?.contents ?? [])].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
-}
-
 /**
  * Resolve the currently-displayed { pageId, anchor } on a V13 journal sheet.
- * The sheet sidebar can include both pages AND heading-anchors within pages.
- * `app.pageIndex` indexes into `app._pages` (TOC entries), not document.pages.
+ * The sheet's TOC (`app._pages` / `app.pageIndex`) can include both pages and
+ * heading-anchors within pages. Each TOC entry carries a pageId + optional anchor.
  */
 function currentPageInfo(app) {
   const empty = { pageId: null, anchor: null };
   if (!app) return empty;
 
-  // V13 pattern: _pages is array of TOC entries with {pageId, anchor, ...}
   if (Array.isArray(app._pages) && Number.isInteger(app.pageIndex)) {
     const entry = app._pages[app.pageIndex];
     if (entry) {
@@ -44,58 +39,13 @@ function currentPageInfo(app) {
     }
   }
 
-  // Some sheets expose _pages as keyed object (alt V13 variant)
-  if (app._pages && typeof app._pages === 'object' && !Array.isArray(app._pages)) {
-    const current = app._pages.current ?? null;
-    if (current) {
-      const pageId = current.pageId ?? current.id;
-      if (pageId && app.document?.pages?.get(pageId)) {
-        return { pageId, anchor: current.anchor ?? null };
-      }
-    }
-  }
-
-  // Direct properties (older or other variants)
   const directId = app.pageId ?? app._pageId;
   if (directId && app.document?.pages?.get(directId)) {
     return { pageId: directId, anchor: null };
   }
 
-  // pageIndex against sorted document.pages (best-effort fallback)
-  const pages = sortedPages(app.document);
-  if (Number.isInteger(app.pageIndex) && pages[app.pageIndex]) {
-    return { pageId: pages[app.pageIndex].id, anchor: null };
-  }
-
-  return { pageId: pages[0]?.id ?? null, anchor: null };
-}
-
-const OBSERVER = 2; // CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
-
-async function elevateOwnership(journal, userId) {
-  const ownership = journal.ownership ?? {};
-  const explicit = ownership[userId];
-  const effective = explicit ?? ownership.default ?? 0;
-  if (effective >= OBSERVER) return { changed: false };
-  await journal.update({ [`ownership.${userId}`]: OBSERVER });
-  log(`Elevated ${userId} to Observer on journal ${journal.id} (was ${explicit ?? 'inherit'})`);
-  return { changed: true, prev: explicit }; // prev is the explicit value (may be undefined)
-}
-
-async function revertOwnership(journal, userId, prev) {
-  const update = {};
-  if (prev === undefined) {
-    // Remove explicit entry — revert to inherited default
-    update[`ownership.-=${userId}`] = null;
-  } else {
-    update[`ownership.${userId}`] = prev;
-  }
-  try {
-    await journal.update(update);
-    log(`Reverted ownership for ${userId} on journal ${journal.id}`);
-  } catch (e) {
-    console.warn(`[${MODULE_ID}] revertOwnership failed`, e);
-  }
+  const firstPage = app.document?.pages?.contents?.[0]?.id;
+  return { pageId: firstPage ?? null, anchor: null };
 }
 
 export async function toggleJournalOnVtt(journalId, pageId, anchor) {
@@ -105,25 +55,14 @@ export async function toggleJournalOnVtt(journalId, pageId, anchor) {
     ui.notifications.warn(t('TABLE_MODE.Notifications.NoVttUser'));
     return;
   }
-  const journal = game.journal?.get(journalId);
-  if (!journal) return;
 
   if (openOnVtt.has(journalId)) {
-    const state = openOnVtt.get(journalId);
     emit(MSG.JOURNAL_CLOSE, { journalId, targetUserId });
     openOnVtt.delete(journalId);
-    if (state.elevated) {
-      await revertOwnership(journal, targetUserId, state.prevOwnership);
-    }
     log('Hide on VTT →', journalId);
   } else {
-    const elevation = await elevateOwnership(journal, targetUserId);
     emit(MSG.JOURNAL_OPEN, { journalId, pageId, anchor, targetUserId });
-    openOnVtt.set(journalId, {
-      pageId, anchor,
-      elevated: elevation.changed,
-      prevOwnership: elevation.prev
-    });
+    openOnVtt.set(journalId, { pageId, anchor });
     log('Show on VTT →', journalId, pageId ?? '(default)', anchor ? `#${anchor}` : '');
   }
   refreshButtonsFor(journalId);
@@ -138,6 +77,7 @@ function refreshButtonsFor(journalId) {
   }
 }
 
+/** GM-side: inject the TV toggle button into journal sheet headers. */
 export function onRenderJournalSheet(app, html) {
   if (!game.user.isGM) return;
   const doc = asJournal(app);
@@ -172,6 +112,7 @@ export function onRenderJournalSheet(app, html) {
   else header.appendChild(btn);
 }
 
+/** VTT-side: when user manually closes a pushed sheet, notify GM so button state flips. */
 export function onVttJournalClose(app) {
   if (game.user.isGM) return;
   if (game.user.id !== getVttUserId()) return;
@@ -191,49 +132,46 @@ export function onVttJournalRender(app) {
   vttOpenApps.set(doc.id, app);
 }
 
-export async function handleJournalState(msg) {
+export function handleJournalState(msg) {
   if (!game.user.isGM) return;
   const { payload, senderId } = msg;
   if (senderId === game.user.id) return;
   if (payload.open !== false) return;
-  const state = openOnVtt.get(payload.journalId);
-  if (!state) return;
+  if (!openOnVtt.has(payload.journalId)) return;
   openOnVtt.delete(payload.journalId);
   refreshButtonsFor(payload.journalId);
-  // Revert permission if we elevated
-  if (state.elevated) {
-    const journal = game.journal?.get(payload.journalId);
-    if (journal) await revertOwnership(journal, getVttUserId(), state.prevOwnership);
-  }
   log('VTT reported journal closed', payload.journalId);
 }
 
-export async function handleJournalOpen(msg) {
+/**
+ * VTT-side: render the requested journal with the right page + anchor.
+ * V13's JournalSheet render() accepts `mode`, `pageId`, `anchor`, `tempOwnership`.
+ * `tempOwnership: true` lets Foundry grant observer access for this render without
+ * persisting an ownership change on the document.
+ */
+export function handleJournalOpen(msg) {
   const { payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
   if (senderId === game.user.id) return;
 
-  // Give the ownership update a moment to land if it's still in-flight
   const journal = game.journal?.get(payload.journalId);
   if (!journal) return;
 
   try {
     const sheet = journal.sheet;
-
-    // Render in single-page mode. Do NOT pass pageIndex — subclasses interpret it inconsistently
-    // (sort-order vs creation-order). Rely on pageId + goToPage instead.
-    const opts = { mode: 1 };
-    if (payload.pageId) opts.pageId = payload.pageId;
-
-    sheet.render(true, opts);
+    sheet.render(true, {
+      mode: 1, // single-page view
+      pageId: payload.pageId ?? undefined,
+      anchor: payload.anchor ?? undefined,
+      tempOwnership: true
+    });
     vttOpenApps.set(payload.journalId, sheet);
 
+    // Safety retry: if the render raced TOC init, re-navigate after layout settles.
     if (payload.pageId && typeof sheet.goToPage === 'function') {
-      const nav = () => {
-        try { sheet.goToPage(payload.pageId, payload.anchor ?? undefined); } catch (_) {}
-      };
-      setTimeout(nav, 150);
-      setTimeout(nav, 500);
+      setTimeout(() => {
+        try { sheet.goToPage(payload.pageId, { anchor: payload.anchor ?? undefined }); } catch (_) {}
+      }, 200);
     }
 
     log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', payload.anchor ? `#${payload.anchor}` : '');
