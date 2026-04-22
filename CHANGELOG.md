@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.1.4] — 2026-04-22
+
+### Fixed
+
+- Sync Viewport fired twice per click (once from `onClick`, once from `onChange`). Removed the `onChange` handler.
+
 ## [0.1.3] — 2026-04-22
 
 ### Removed

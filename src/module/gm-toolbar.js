@@ -21,11 +21,7 @@ export function registerSceneControls() {
           title: t('TABLE_MODE.Controls.SyncOnce'),
           icon: 'fas fa-crosshairs',
           button: true,
-          onClick: () => syncOnce(),
-          onChange: (_event, active) => {
-            // V13 fires onChange for button tools as well; only act on explicit click.
-            if (active === true) syncOnce();
-          }
+          onClick: () => syncOnce()
         }
       }
       // Deliberately no `activeTool` — avoids firing the default tool's handler
