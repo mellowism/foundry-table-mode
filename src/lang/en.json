@@ -1,0 +1,12 @@
+{
+  "TABLE_MODE.Controls.Title": "Table Mode",
+  "TABLE_MODE.Controls.SyncOnce": "Sync Viewport to VTT",
+  "TABLE_MODE.Controls.ToggleLock": "Lock VTT Viewport to GM",
+  "TABLE_MODE.Settings.VttUser.Name": "VTT User",
+  "TABLE_MODE.Settings.VttUser.Hint": "The Foundry user whose client renders on the table TV. Viewport commands from the GM are sent to this user.",
+  "TABLE_MODE.Settings.AnimationDuration.Name": "Sync Animation Duration (ms)",
+  "TABLE_MODE.Settings.AnimationDuration.Hint": "Duration of the pan/zoom animation when using Sync Once. Lock mode always snaps instantly.",
+  "TABLE_MODE.Notifications.NoVttUser": "Table Mode: no VTT user selected. Set one in module settings first.",
+  "TABLE_MODE.Notifications.Locked": "Table Mode: VTT viewport locked to GM.",
+  "TABLE_MODE.Notifications.Unlocked": "Table Mode: VTT viewport unlocked."
+}
