@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.2.2] — 2026-04-22
+
+### Fixed
+
+- Viewbox drag/resize events now fire. Registered handlers on the graphics objects themselves (not `canvas.stage`), enabled `interactiveChildren`, and switched to `eventMode = 'dynamic'`. Logs `[foundry-table-mode] drag start` to console when a drag begins.
+
+### Added
+
+- **VTT Screen Aspect Ratio** setting — fallback when auto-detect from VTT client misses. Options: Auto, 16:9, 16:10, 4:3, 21:9, 32:9. Changes apply immediately to an active viewbox.
+
 ## [0.2.1] — 2026-04-22
 
 ### Fixed

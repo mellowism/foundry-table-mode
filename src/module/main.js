@@ -6,6 +6,7 @@ import {
   handleIncomingViewbox,
   handleClientHello,
   announceClientAspect,
+  applyAspectNow,
   onCanvasReady as onViewboxCanvasReady,
   onCanvasTeardown as onViewboxCanvasTeardown
 } from './viewbox-controller.js';
@@ -39,6 +40,12 @@ Hooks.once('ready', () => {
   if (!game.user.isGM && game.user.id === getVttUserId()) {
     announceClientAspect();
     window.addEventListener('resize', () => announceClientAspect());
+  }
+});
+
+Hooks.on('updateSetting', (setting) => {
+  if (setting?.key === `${MODULE_ID}.vttAspect`) {
+    applyAspectNow();
   }
 });
 

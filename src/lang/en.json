@@ -4,6 +4,8 @@
   "TABLE_MODE.Controls.SyncOnce": "Sync Viewport to VTT",
   "TABLE_MODE.Settings.VttUser.Name": "VTT User",
   "TABLE_MODE.Settings.VttUser.Hint": "The Foundry user whose client renders on the table TV. Viewport commands are sent to this user. GM accounts are excluded; Assistant GM is allowed.",
+  "TABLE_MODE.Settings.VttAspect.Name": "VTT Screen Aspect Ratio",
+  "TABLE_MODE.Settings.VttAspect.Hint": "Locks the viewbox to this aspect ratio. Use 'Auto' to detect the VTT client's actual screen. Override if auto-detection gives wrong results (e.g., VTT tab has a sidebar open).",
   "TABLE_MODE.Settings.AnimationDuration.Name": "Sync Animation Duration (ms)",
   "TABLE_MODE.Settings.AnimationDuration.Hint": "Duration of the pan/zoom animation when the VTT client receives a viewport sync.",
   "TABLE_MODE.Notifications.NoVttUser": "Table Mode: no VTT user selected. Set one in module settings first.",

@@ -1,5 +1,5 @@
 import { MODULE_ID, SOCKET_NAME, MSG } from './socket-protocol.js';
-import { getVttUserId } from './settings.js';
+import { getVttUserId, getAspectOverride } from './settings.js';
 import { ViewboxOverlay } from './viewbox-overlay.js';
 
 const FLAG_KEY = 'viewbox';
@@ -9,13 +9,17 @@ let overlay = null;
 let enabled = false;
 let vttAspect = FALLBACK_ASPECT;
 
+function effectiveAspect() {
+  return getAspectOverride() ?? vttAspect ?? FALLBACK_ASPECT;
+}
+
 function log(...args) { console.log(`[${MODULE_ID}]`, ...args); }
 
 function defaultViewbox(scene) {
   const sw = scene?.dimensions?.width ?? scene?.width ?? 4000;
   const sh = scene?.dimensions?.height ?? scene?.height ?? 3000;
   const w = Math.round(sw * 0.5);
-  const h = Math.round(w / vttAspect);
+  const h = Math.round(w / effectiveAspect());
   return {
     x: Math.round(sw / 2),
     y: Math.round(sh / 2),
@@ -58,13 +62,17 @@ function broadcastClear() {
 async function createOverlay(initial) {
   overlay = new ViewboxOverlay({
     ...initial,
-    aspect: vttAspect,
+    aspect: effectiveAspect(),
     onChange: async (next) => {
       await writeFlag(next);
       broadcastCurrent();
     }
   });
   canvas.stage.addChild(overlay);
+}
+
+export function applyAspectNow() {
+  if (overlay) overlay.setAspect(effectiveAspect());
 }
 
 export function isEnabled() { return enabled; }
@@ -141,7 +149,7 @@ export function handleClientHello(msg) {
   if (!aspect || !isFinite(aspect) || aspect <= 0) return;
   vttAspect = aspect;
   log(`VTT aspect received: ${aspect.toFixed(3)} (${payload.innerWidth}×${payload.innerHeight})`);
-  if (overlay) overlay.setAspect(aspect);
+  if (overlay && getAspectOverride() == null) overlay.setAspect(aspect);
 }
 
 /** VTT-side: apply incoming viewbox as pan+scale. Uses MAX scale so viewbox fills screen. */
