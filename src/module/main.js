@@ -12,6 +12,11 @@ import {
 } from './viewbox-controller.js';
 import { applyUiCleanup } from './vtt-ui-cleanup.js';
 import { handleIncomingReload } from './client-actions.js';
+import {
+  onRenderJournalSheet,
+  handleJournalOpen,
+  handleJournalClose
+} from './journal-push.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 
@@ -36,6 +41,10 @@ Hooks.once('ready', () => {
           handleClientHello(msg); break;
         case MSG.CLIENT_RELOAD:
           handleIncomingReload(msg); break;
+        case MSG.JOURNAL_OPEN:
+          handleJournalOpen(msg); break;
+        case MSG.JOURNAL_CLOSE:
+          handleJournalClose(msg); break;
       }
     } catch (e) {
       console.error(`[${MODULE_ID}] socket handler error`, e);
@@ -57,6 +66,11 @@ Hooks.on('updateSetting', (setting) => {
   if (shortKey === 'vttAspect') applyAspectNow();
   if (UI_SETTING_KEYS.has(shortKey)) applyUiCleanup();
 });
+
+// Journal header button — inject on render. Try several hook names for V13 variants.
+Hooks.on('renderJournalSheet', onRenderJournalSheet);
+Hooks.on('renderJournalEntrySheet', onRenderJournalSheet);
+Hooks.on('renderJournalPageSheet', onRenderJournalSheet);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));

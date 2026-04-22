@@ -6,5 +6,8 @@ export const MSG = {
   VIEWBOX_UPDATE: 'viewbox.update',
   VIEWBOX_CLEAR: 'viewbox.clear',
   CLIENT_HELLO: 'client.hello',
-  CLIENT_RELOAD: 'client.reload'
+  CLIENT_RELOAD: 'client.reload',
+  JOURNAL_OPEN: 'journal.open',
+  JOURNAL_CLOSE: 'journal.close',
+  JOURNAL_STATE: 'journal.state'
 };

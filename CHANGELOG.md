@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.0] — 2026-04-22
+
+### Added — Journal push/close toggle
+
+A TV icon button injected into every journal sheet header (GM-only). Click once to open the journal on the VTT client; click again to close it. Button state reflects the last command sent (amber = open, default = closed).
+
+Works for core JournalSheet and JournalEntrySheet variants. Multi-page journals open at their default page.
+
+### Socket protocol
+
+- Added `journal.open` and `journal.close` message types.
+
 ## [0.3.1] — 2026-04-22
 
 ### Changed
