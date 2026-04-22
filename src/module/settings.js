@@ -8,7 +8,8 @@ export const SETTINGS = {
 export function registerSettings() {
   const userChoices = { '': '— none —' };
   for (const u of game.users?.contents ?? []) {
-    userChoices[u.id] = `${u.name}${u.isGM ? ' (GM)' : ''}`;
+    if (u.isGM) continue; // VTT client is a dedicated player account, never a GM
+    userChoices[u.id] = u.name;
   }
 
   game.settings.register(MODULE_ID, SETTINGS.VTT_USER_ID, {

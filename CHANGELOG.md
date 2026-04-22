@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.1.2] — 2026-04-22
+
+### Fixed
+
+- Sync Viewport button now fires its handler — V13 button-type tools use `onClick`, not `onChange`.
+
+### Changed
+
+- VTT User dropdown filters out GM accounts. The VTT client is always a player account.
+
 ## [0.1.1] — 2026-04-22
 
 ### Fixed
