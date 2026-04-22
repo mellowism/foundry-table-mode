@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.4.5] — 2026-04-22
+
+### Changed
+
+- Journal page list sidebar is now always hidden on the VTT client. Players at the table see only the current page content — they don't need page navigation. Applies independent of the Hide VTT UI setting.
+
 ## [0.4.4] — 2026-04-22
 
 ### Fixed
