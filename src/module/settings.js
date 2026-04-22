@@ -7,8 +7,9 @@ export const SETTINGS = {
 
 export function registerSettings() {
   const userChoices = { '': '— none —' };
+  const GAMEMASTER = CONST.USER_ROLES.GAMEMASTER; // 4
   for (const u of game.users?.contents ?? []) {
-    if (u.isGM) continue; // VTT client is a dedicated player account, never a GM
+    if (u.role >= GAMEMASTER) continue; // exclude full GMs; keep Assistant GM and below
     userChoices[u.id] = u.name;
   }
 

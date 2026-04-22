@@ -1,5 +1,5 @@
 import { MODULE_ID } from './socket-protocol.js';
-import { syncOnce, toggleLock, isLocked } from './viewport-controller.js';
+import { syncOnce } from './viewport-controller.js';
 
 function t(key) {
   return game.i18n.localize(key);
@@ -22,23 +22,16 @@ export function registerSceneControls() {
           icon: 'fas fa-crosshairs',
           button: true,
           onClick: () => syncOnce(),
-          onChange: () => syncOnce()
-        },
-        lock: {
-          name: 'lock',
-          title: t('TABLE_MODE.Controls.ToggleLock'),
-          icon: 'fas fa-lock',
-          toggle: true,
-          active: isLocked(),
           onChange: (_event, active) => {
-            if (active !== isLocked()) toggleLock();
+            // V13 fires onChange for button tools as well; only act on explicit click.
+            if (active === true) syncOnce();
           }
         }
-      },
-      activeTool: 'sync'
+      }
+      // Deliberately no `activeTool` — avoids firing the default tool's handler
+      // when the category button is clicked.
     };
 
-    // V13 scene controls is an object keyed by control id.
     if (Array.isArray(controls)) {
       controls.push(tableControl);
     } else {

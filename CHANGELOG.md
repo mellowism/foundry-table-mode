@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.1.3] — 2026-04-22
+
+### Removed
+
+- **Lock Viewport to GM** tool — removed in favor of the upcoming Viewbox model (v0.2.0). Having both was confusing; Viewbox is the single viewport paradigm going forward.
+
+### Changed
+
+- VTT User dropdown now excludes only the Gamemaster role (4). Assistant GM (3) and Trusted Player (2) are allowed.
+- Sync Viewport toolbar is now the only tool in the Table Mode category. Removed `activeTool` default so clicking the category button does not auto-fire sync.
+- Sync confirms with a notification on success.
+
 ## [0.1.2] — 2026-04-22
 
 ### Fixed
