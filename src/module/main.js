@@ -20,7 +20,7 @@ import {
   handleJournalClose,
   handleJournalState
 } from './journal-push.js';
-import { installNoteHud, onCanvasReady as onNoteHudCanvasReady } from './note-hud.js';
+import { installNoteHud, onCanvasReady as onNoteHudCanvasReady, onReady as onNoteHudReady } from './note-hud.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 
@@ -64,6 +64,7 @@ Hooks.once('ready', () => {
   }
 
   applyUiCleanup();
+  onNoteHudReady();
 });
 
 Hooks.on('updateSetting', (setting) => {

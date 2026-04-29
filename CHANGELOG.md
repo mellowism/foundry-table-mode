@@ -2,6 +2,13 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.1] — 2026-04-29
+
+### Diagnostics
+
+- Verbose logging added to NoteHUD install path (v0.5.0 silently failed to set `canvas.hud.note` in the field). Each step now logs: API resolution, class build, canvas.hud presence, instantiation outcome.
+- Added `ready`-hook fallback in addition to `canvasReady` — covers cases where canvas.hud isn't available when canvasReady fires.
+
 ## [0.5.0] — 2026-04-29
 
 ### Added — Map Note quick-toggle (MEJ-style)

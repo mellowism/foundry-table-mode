@@ -1,14 +1,32 @@
 import { MODULE_ID } from './socket-protocol.js';
 
 function log(...args) { console.log(`[${MODULE_ID}]`, ...args); }
+function warn(...args) { console.warn(`[${MODULE_ID}]`, ...args); }
+function err(...args) { console.error(`[${MODULE_ID}]`, ...args); }
 
 let NoteHUDClass = null;
 
+function resolveBaseAPI() {
+  const Base =
+    foundry?.applications?.hud?.BasePlaceableHUD ??
+    foundry?.applications?.hud?.placeable?.BasePlaceableHUD ??
+    globalThis.BasePlaceableHUD ??
+    null;
+  const HMixin =
+    foundry?.applications?.api?.HandlebarsApplicationMixin ??
+    globalThis.HandlebarsApplicationMixin ??
+    null;
+  log('resolveBaseAPI →',
+    'foundry.applications.hud:', !!foundry?.applications?.hud,
+    'BasePlaceableHUD:', !!Base, Base?.name,
+    'HMixin:', !!HMixin);
+  return { Base, HMixin };
+}
+
 function buildNoteHUDClass() {
-  const Base = foundry.applications?.hud?.BasePlaceableHUD ?? globalThis.BasePlaceableHUD;
-  const HMixin = foundry.applications?.api?.HandlebarsApplicationMixin;
+  const { Base, HMixin } = resolveBaseAPI();
   if (!Base || !HMixin) {
-    console.error(`[${MODULE_ID}] Missing V13 HUD APIs (BasePlaceableHUD / HandlebarsApplicationMixin)`);
+    err('Missing V13 HUD APIs — cannot build NoteHUD class');
     return null;
   }
 
@@ -28,7 +46,7 @@ function buildNoteHUDClass() {
           { diff: false, recursive: false }
         );
       } catch (e) {
-        console.error(`[${MODULE_ID}] Note ownership update failed`, e);
+        err('Note ownership update failed', e);
         return;
       }
       this.render();
@@ -54,6 +72,7 @@ function buildNoteHUDClass() {
       const LEVELS = CONST.DOCUMENT_OWNERSHIP_LEVELS;
       const level = ownership.default ?? LEVELS.NONE;
       const isHidden = level < LEVELS.OBSERVER;
+      log('NoteHUD _prepareContext', { isHidden, level });
       return {
         id: this.id,
         appId: this.appId,
@@ -72,46 +91,63 @@ function buildNoteHUDClass() {
     }
   }
 
+  log('buildNoteHUDClass succeeded:', NoteHUD?.name);
   return NoteHUD;
 }
 
-/**
- * Install hooks that wire Note placeables to a HUD:
- *  - Note._canHUD → true for GM with a valid entry
- *  - NotesLayer.hud getter → canvas.hud.note
- * Safe to call once at init.
- */
 export function installNoteHud() {
-  const NoteCls = foundry.canvas?.placeables?.Note ?? globalThis.Note;
+  log('installNoteHud start');
+  const NoteCls = foundry?.canvas?.placeables?.Note ?? globalThis.Note;
+  log('Note class:', !!NoteCls, NoteCls?.name);
   if (NoteCls?.prototype) {
     NoteCls.prototype._canHUD = function () {
       return game.user.isGM && !!this.document?.entryId;
     };
+    log('Note.prototype._canHUD installed');
   } else {
-    console.warn(`[${MODULE_ID}] Note class not found at install time`);
+    warn('Note class not found at install time');
   }
 
-  const NotesLayerCls = foundry.canvas?.layers?.NotesLayer ?? globalThis.NotesLayer;
+  const NotesLayerCls = foundry?.canvas?.layers?.NotesLayer ?? globalThis.NotesLayer;
+  log('NotesLayer class:', !!NotesLayerCls, NotesLayerCls?.name);
   if (NotesLayerCls?.prototype) {
-    const existing = Object.getOwnPropertyDescriptor(NotesLayerCls.prototype, 'hud');
-    if (!existing) {
-      Object.defineProperty(NotesLayerCls.prototype, 'hud', {
-        get() { return canvas?.hud?.note ?? null; },
-        configurable: true
-      });
-    }
+    Object.defineProperty(NotesLayerCls.prototype, 'hud', {
+      get() { return canvas?.hud?.note ?? null; },
+      configurable: true
+    });
+    log('NotesLayer.prototype.hud getter installed');
+  }
+  log('installNoteHud done');
+}
+
+export function ensureCanvasHud() {
+  log('ensureCanvasHud — canvas.hud:', !!canvas?.hud, canvas?.hud?.constructor?.name);
+  if (!canvas?.hud) {
+    warn('canvas.hud not available yet');
+    return false;
+  }
+  if (canvas.hud.note) {
+    log('canvas.hud.note already set — skipping');
+    return true;
+  }
+  if (!NoteHUDClass) NoteHUDClass = buildNoteHUDClass();
+  if (!NoteHUDClass) return false;
+  try {
+    canvas.hud.note = new NoteHUDClass();
+    log('canvas.hud.note assigned:', !!canvas.hud.note, canvas.hud.note?.constructor?.name);
+    return true;
+  } catch (e) {
+    err('Failed to instantiate NoteHUD', e);
+    return false;
   }
 }
 
 export function onCanvasReady() {
-  if (!canvas?.hud) return;
-  if (canvas.hud.note) return;
-  if (!NoteHUDClass) NoteHUDClass = buildNoteHUDClass();
-  if (!NoteHUDClass) return;
-  try {
-    canvas.hud.note = new NoteHUDClass();
-    log('NoteHUD installed on canvas.hud.note');
-  } catch (e) {
-    console.error(`[${MODULE_ID}] Failed to instantiate NoteHUD`, e);
-  }
+  log('onCanvasReady fired');
+  ensureCanvasHud();
+}
+
+export function onReady() {
+  log('onReady fired');
+  ensureCanvasHud();
 }
