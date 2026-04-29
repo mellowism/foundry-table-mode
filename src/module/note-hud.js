@@ -1,52 +1,51 @@
 import { MODULE_ID } from './socket-protocol.js';
 
-function log(...args) { console.log(`[${MODULE_ID}]`, ...args); }
-function warn(...args) { console.warn(`[${MODULE_ID}]`, ...args); }
-function err(...args) { console.error(`[${MODULE_ID}]`, ...args); }
-
 let NoteHUDClass = null;
 
-function resolveBaseAPI() {
+function buildNoteHUDClass() {
   const Base =
     foundry?.applications?.hud?.BasePlaceableHUD ??
-    foundry?.applications?.hud?.placeable?.BasePlaceableHUD ??
     globalThis.BasePlaceableHUD ??
     null;
   const HMixin =
     foundry?.applications?.api?.HandlebarsApplicationMixin ??
     globalThis.HandlebarsApplicationMixin ??
     null;
-  log('resolveBaseAPI →',
-    'foundry.applications.hud:', !!foundry?.applications?.hud,
-    'BasePlaceableHUD:', !!Base, Base?.name,
-    'HMixin:', !!HMixin);
-  return { Base, HMixin };
-}
 
-function buildNoteHUDClass() {
-  const { Base, HMixin } = resolveBaseAPI();
   if (!Base || !HMixin) {
-    err('Missing V13 HUD APIs — cannot build NoteHUD class');
+    console.error(`[${MODULE_ID}] Missing V13 HUD APIs — BasePlaceableHUD=${!!Base} HMixin=${!!HMixin}`);
     return null;
   }
 
+  /**
+   * Resolve the JournalEntry or JournalEntryPage that controls the note's
+   * player visibility. Foundry checks the linked entry's ownership when
+   * deciding whether a player can see the note icon — NOT the NoteDocument's
+   * own ownership. Prefer the specific page when one is set, otherwise the
+   * whole entry.
+   */
+  function visibilityTarget(noteDoc) {
+    return noteDoc?.page ?? noteDoc?.entry ?? null;
+  }
+
   class NoteHUD extends HMixin(Base) {
-    static async _onToggleVisibility(event, target) {
+    static async _onToggleVisibility(event) {
       event?.preventDefault?.();
       event?.stopPropagation?.();
-      const doc = this.document;
-      if (!doc) return;
+      const target = visibilityTarget(this.document);
+      if (!target) {
+        console.warn(`[${MODULE_ID}] NoteHUD: no entry/page linked — cannot toggle`);
+        return;
+      }
       const LEVELS = CONST.DOCUMENT_OWNERSHIP_LEVELS;
-      const current = doc.ownership?.default ?? LEVELS.NONE;
+      const ownership = foundry.utils.deepClone(target.ownership ?? {});
+      const current = ownership.default ?? LEVELS.NONE;
       const isHidden = current < LEVELS.OBSERVER;
-      const newLevel = isHidden ? LEVELS.OBSERVER : LEVELS.NONE;
+      ownership.default = isHidden ? LEVELS.OBSERVER : LEVELS.NONE;
       try {
-        await doc.update(
-          { ownership: { default: newLevel } },
-          { diff: false, recursive: false }
-        );
+        await target.update({ ownership });
       } catch (e) {
-        err('Note ownership update failed', e);
+        console.error(`[${MODULE_ID}] Visibility update failed`, e);
         return;
       }
       this.render();
@@ -68,11 +67,10 @@ function buildNoteHUDClass() {
     };
 
     async _prepareContext() {
-      const ownership = this.document?.ownership ?? {};
+      const target = visibilityTarget(this.document);
       const LEVELS = CONST.DOCUMENT_OWNERSHIP_LEVELS;
-      const level = ownership.default ?? LEVELS.NONE;
+      const level = target?.ownership?.default ?? LEVELS.NONE;
       const isHidden = level < LEVELS.OBSERVER;
-      log('NoteHUD _prepareContext', { isHidden, level });
       return {
         id: this.id,
         appId: this.appId,
@@ -87,67 +85,47 @@ function buildNoteHUDClass() {
       if (typeof out.left === 'number') {
         out.left = out.left - (iconSize / 2);
       }
+      if (typeof out.top === 'number') {
+        out.top = out.top - (iconSize / 2);
+      }
       return out;
     }
   }
 
-  log('buildNoteHUDClass succeeded:', NoteHUD?.name);
   return NoteHUD;
 }
 
+/**
+ * Install hooks that wire Note placeables to a HUD:
+ *  - Note._canHUD → true for GM with a valid entry
+ *  - NotesLayer.hud getter → canvas.hud.note
+ */
 export function installNoteHud() {
-  log('installNoteHud start');
   const NoteCls = foundry?.canvas?.placeables?.Note ?? globalThis.Note;
-  log('Note class:', !!NoteCls, NoteCls?.name);
-  if (NoteCls?.prototype) {
-    NoteCls.prototype._canHUD = function () {
-      return game.user.isGM && !!this.document?.entryId;
-    };
-    log('Note.prototype._canHUD installed');
-  } else {
-    warn('Note class not found at install time');
-  }
-
   const NotesLayerCls = foundry?.canvas?.layers?.NotesLayer ?? globalThis.NotesLayer;
-  log('NotesLayer class:', !!NotesLayerCls, NotesLayerCls?.name);
-  if (NotesLayerCls?.prototype) {
-    Object.defineProperty(NotesLayerCls.prototype, 'hud', {
-      get() { return canvas?.hud?.note ?? null; },
-      configurable: true
-    });
-    log('NotesLayer.prototype.hud getter installed');
-  }
-  log('installNoteHud done');
-}
 
-export function ensureCanvasHud() {
-  log('ensureCanvasHud — canvas.hud:', !!canvas?.hud, canvas?.hud?.constructor?.name);
-  if (!canvas?.hud) {
-    warn('canvas.hud not available yet');
-    return false;
+  if (!NoteCls?.prototype || !NotesLayerCls?.prototype) {
+    console.error(`[${MODULE_ID}] NoteHUD install failed — Note=${!!NoteCls} NotesLayer=${!!NotesLayerCls}`);
+    return;
   }
-  if (canvas.hud.note) {
-    log('canvas.hud.note already set — skipping');
-    return true;
-  }
-  if (!NoteHUDClass) NoteHUDClass = buildNoteHUDClass();
-  if (!NoteHUDClass) return false;
-  try {
-    canvas.hud.note = new NoteHUDClass();
-    log('canvas.hud.note assigned:', !!canvas.hud.note, canvas.hud.note?.constructor?.name);
-    return true;
-  } catch (e) {
-    err('Failed to instantiate NoteHUD', e);
-    return false;
-  }
+
+  NoteCls.prototype._canHUD = function () {
+    return game.user.isGM && !!this.document?.entryId;
+  };
+
+  Object.defineProperty(NotesLayerCls.prototype, 'hud', {
+    get() { return canvas?.hud?.note ?? null; },
+    configurable: true
+  });
 }
 
 export function onCanvasReady() {
-  log('onCanvasReady fired');
-  ensureCanvasHud();
-}
-
-export function onReady() {
-  log('onReady fired');
-  ensureCanvasHud();
+  if (!canvas?.hud || canvas.hud.note) return;
+  if (!NoteHUDClass) NoteHUDClass = buildNoteHUDClass();
+  if (!NoteHUDClass) return;
+  try {
+    canvas.hud.note = new NoteHUDClass();
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Failed to instantiate NoteHUD`, e);
+  }
 }

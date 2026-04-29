@@ -2,6 +2,17 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.2] — 2026-04-29
+
+### Fixed
+
+- **NoteHUD visibility toggle now actually hides the note for players.** Previous versions updated `NoteDocument.ownership`, but Foundry's note-visibility check tests the *linked JournalEntry's* (or page's) ownership — not the placeable's. We now update `note.document.page ?? note.document.entry` instead, matching MEJ's approach.
+
+### Cleanup
+
+- Removed verbose diagnostic logging that was added in 0.5.1 to chase the deploy issue. Errors still log; happy-path is silent.
+- Removed redundant `ready`-hook fallback for HUD setup — `canvasReady` is sufficient.
+
 ## [0.5.1] — 2026-04-29
 
 ### Diagnostics
