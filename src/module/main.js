@@ -20,12 +20,14 @@ import {
   handleJournalClose,
   handleJournalState
 } from './journal-push.js';
+import { installNoteHud, onCanvasReady as onNoteHudCanvasReady } from './note-hud.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
   registerSceneControls();
+  installNoteHud();
 });
 
 Hooks.once('ready', () => {
@@ -89,6 +91,7 @@ Hooks.on('closeJournalEntrySheet', onVttJournalClose);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));
+  onNoteHudCanvasReady();
 });
 
 Hooks.on('canvasTearDown', () => {

@@ -2,6 +2,19 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.0] — 2026-04-29
+
+### Added — Map Note quick-toggle (MEJ-style)
+
+Right-click a map note as GM to open a small HUD with an eye-icon. Click the icon to toggle player visibility for that note: hidden = `ownership.default = NONE` (note icon disappears for all players), visible = `ownership.default = OBSERVER`. Button gets a red `.active` state when the note is hidden.
+
+Implemented via:
+- `Note.prototype._canHUD` override (GM + note must have an entry)
+- `NotesLayer.prototype.hud` getter pointing at `canvas.hud.note`
+- `canvas.hud.note` instance built from a V13 `BasePlaceableHUD` + `HandlebarsApplicationMixin` subclass
+
+Standalone — does not currently coexist with Monk's Enhanced Journal (which owns the same `canvas.hud.note` slot).
+
 ## [0.4.9] — 2026-04-22
 
 ### Fixed

@@ -1,0 +1,9 @@
+<form id="{{id}}" class="placeable-hud table-mode-note-hud" data-appid="{{appId}}" autocomplete="off" onsubmit="event.preventDefault();">
+    <div class="col right">
+        {{#if isGM}}
+        <button type="button" class="control-icon {{visibilityClass}}" data-action="visibility" data-tooltip="{{localize 'TABLE_MODE.NoteHud.ToggleVis'}}">
+            <i class="fas fa-eye"></i>
+        </button>
+        {{/if}}
+    </div>
+</form>
