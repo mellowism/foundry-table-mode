@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.3] — 2026-04-29
+
+### Fixed
+
+- **Right-click HUD activation now works on all V13 builds.** Previous versions relied on patching `NotesLayer.prototype.hud` getter so Foundry's default `_onClickRight` could bind the HUD. On some V13 builds that property is non-configurable and the patch silently fails — Foundry then crashes on `null.object` and the right-click does nothing. We now override `Note.prototype._onClickRight` directly and bind `canvas.hud.note` ourselves. No more dependence on the layer-getter indirection.
+
+### Diagnostics
+
+- One log line per install + canvasReady so future regressions surface in console.
+
 ## [0.5.2] — 2026-04-29
 
 ### Fixed

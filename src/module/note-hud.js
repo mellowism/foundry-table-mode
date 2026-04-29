@@ -17,13 +17,6 @@ function buildNoteHUDClass() {
     return null;
   }
 
-  /**
-   * Resolve the JournalEntry or JournalEntryPage that controls the note's
-   * player visibility. Foundry checks the linked entry's ownership when
-   * deciding whether a player can see the note icon — NOT the NoteDocument's
-   * own ownership. Prefer the specific page when one is set, otherwise the
-   * whole entry.
-   */
   function visibilityTarget(noteDoc) {
     return noteDoc?.page ?? noteDoc?.entry ?? null;
   }
@@ -95,17 +88,10 @@ function buildNoteHUDClass() {
   return NoteHUD;
 }
 
-/**
- * Install hooks that wire Note placeables to a HUD:
- *  - Note._canHUD → true for GM with a valid entry
- *  - NotesLayer.hud getter → canvas.hud.note
- */
 export function installNoteHud() {
   const NoteCls = foundry?.canvas?.placeables?.Note ?? globalThis.Note;
-  const NotesLayerCls = foundry?.canvas?.layers?.NotesLayer ?? globalThis.NotesLayer;
-
-  if (!NoteCls?.prototype || !NotesLayerCls?.prototype) {
-    console.error(`[${MODULE_ID}] NoteHUD install failed — Note=${!!NoteCls} NotesLayer=${!!NotesLayerCls}`);
+  if (!NoteCls?.prototype) {
+    console.error(`[${MODULE_ID}] Note class not found — install aborted`);
     return;
   }
 
@@ -113,18 +99,31 @@ export function installNoteHud() {
     return game.user.isGM && !!this.document?.entryId;
   };
 
-  Object.defineProperty(NotesLayerCls.prototype, 'hud', {
-    get() { return canvas?.hud?.note ?? null; },
-    configurable: true
-  });
+  // Override right-click directly. Default Foundry impl assumes layer.hud is
+  // a non-null object — on some V13 builds NotesLayer.hud returns null and the
+  // default crashes silently. Bypass the layer indirection entirely.
+  NoteCls.prototype._onClickRight = function (event) {
+    if (!this._canHUD?.(game.user, event)) return;
+    const hud = canvas?.hud?.note;
+    if (!hud) return;
+    if (hud.object === this) hud.clear();
+    else hud.bind(this);
+  };
+  // V13 also dispatches via _onClickRight2 in some cases (double-right) —
+  // alias to the same handler so we don't lose binds on rapid clicks.
+  NoteCls.prototype._onClickRight2 = NoteCls.prototype._onClickRight;
+
+  console.log(`[${MODULE_ID}] NoteHUD install: _canHUD + _onClickRight patched on Note.prototype`);
 }
 
 export function onCanvasReady() {
+  console.log(`[${MODULE_ID}] NoteHUD canvasReady — canvas.hud=${!!canvas?.hud} existing.note=${!!canvas?.hud?.note}`);
   if (!canvas?.hud || canvas.hud.note) return;
   if (!NoteHUDClass) NoteHUDClass = buildNoteHUDClass();
   if (!NoteHUDClass) return;
   try {
     canvas.hud.note = new NoteHUDClass();
+    console.log(`[${MODULE_ID}] canvas.hud.note assigned: ${canvas.hud.note?.constructor?.name}`);
   } catch (e) {
     console.error(`[${MODULE_ID}] Failed to instantiate NoteHUD`, e);
   }
