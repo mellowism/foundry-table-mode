@@ -15,10 +15,10 @@ function getEmbedUrl(page) {
 }
 
 /* =========================================================
- * GM-side state — track which embed is currently open on VTT
+ * GM-side state
  * ========================================================= */
 
-let activeEmbed = null; // { pageId, url } | null
+let activeEmbed = null; // { pageId, url, title } | null
 
 export function isEmbedActive(pageId) {
   return activeEmbed?.pageId === pageId;
@@ -42,8 +42,9 @@ export async function toggleEmbedOnVtt(page) {
     refreshSheets(page);
     return;
   }
-  emit(MSG.EMBED_OPEN, { pageId: page.id, url, targetUserId });
-  activeEmbed = { pageId: page.id, url };
+  const title = page.name || page.parent?.name || 'Embed';
+  emit(MSG.EMBED_OPEN, { pageId: page.id, url, title, targetUserId });
+  activeEmbed = { pageId: page.id, url, title };
   refreshSheets(page);
 }
 
@@ -69,22 +70,19 @@ function refreshSheets(page) {
 }
 
 /* =========================================================
- * Page-sheet UI injection — adds an Embed URL field to the
- * Text-page edit form. Works for any V13 sheet via render hook.
+ * Page-sheet UI injection
  * ========================================================= */
 
 export function onRenderJournalPageSheet(app, html) {
   if (!game.user.isGM) return;
   const page = app?.document;
   if (!page) return;
-  if (page.type !== 'text') return; // for now only text pages get the field
+  if (page.type !== 'text') return;
   const root = html?.jquery ? html[0] : html;
   if (!root?.querySelector) return;
-  if (root.querySelector(`[data-${MODULE_ID}-embed-url]`)) return; // already injected
+  if (root.querySelector(`[data-${MODULE_ID}-embed-url]`)) return;
 
-  // Find the form to inject above
   const form = root.querySelector('form') ?? root;
-
   const current = getEmbedUrl(page);
 
   const container = document.createElement('div');
@@ -101,7 +99,6 @@ export function onRenderJournalPageSheet(app, html) {
     <p class="hint">${t('TABLE_MODE.EmbedUrl.FieldHint')}</p>
   `;
 
-  // Insert at top of form
   if (form.firstChild) form.insertBefore(container, form.firstChild);
   else form.appendChild(container);
 }
@@ -111,68 +108,117 @@ function escapeAttr(s) {
 }
 
 /* =========================================================
- * VTT-side iframe overlay
+ * VTT-side: ApplicationV2 window with iframe
  * ========================================================= */
 
-let overlayEl = null;
-let overlayIframe = null;
+let EmbedFrameAppClass = null;
+let activeApp = null;
 
-function ensureOverlay() {
-  if (overlayEl) return overlayEl;
-  overlayEl = document.createElement('div');
-  overlayEl.id = `${MODULE_ID}-embed-overlay`;
-  overlayEl.className = 'table-mode-embed-overlay';
-  overlayEl.style.cssText = `
-    position: fixed; inset: 0; z-index: 9999;
-    background: #000; display: none;
-  `;
-  overlayIframe = document.createElement('iframe');
-  overlayIframe.style.cssText = `
-    width: 100%; height: 100%; border: 0; background: #000;
-  `;
-  overlayIframe.setAttribute('allow', 'fullscreen');
-  overlayEl.appendChild(overlayIframe);
-  document.body.appendChild(overlayEl);
-  return overlayEl;
+function buildAppClass() {
+  const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+  class EmbedFrameApp extends HandlebarsApplicationMixin(ApplicationV2) {
+    static DEFAULT_OPTIONS = {
+      id: `${MODULE_ID}-embed-frame`,
+      classes: ['table-mode-embed-frame'],
+      tag: 'section',
+      window: {
+        icon: 'fas fa-tv',
+        resizable: true,
+        contentClasses: ['table-mode-embed-frame-content']
+      },
+      position: {
+        width: 900,
+        height: 1100
+      }
+    };
+
+    static PARTS = {
+      content: {
+        template: `modules/${MODULE_ID}/src/templates/embed-frame.html`,
+        root: true
+      }
+    };
+
+    constructor(options = {}) {
+      super(options);
+      this._url = options.url ?? '';
+      this._title = options.embedTitle ?? t('TABLE_MODE.EmbedFrame.DefaultTitle');
+    }
+
+    get title() { return this._title; }
+
+    setUrl(url, title) {
+      this._url = url;
+      if (title) this._title = title;
+      if (this.rendered) this.render();
+    }
+
+    reload() {
+      const iframe = this.element?.querySelector('iframe');
+      if (!iframe) return;
+      const src = iframe.src;
+      iframe.src = 'about:blank';
+      setTimeout(() => { iframe.src = src; }, 50);
+    }
+
+    async _prepareContext() {
+      return { url: this._url || 'about:blank' };
+    }
+
+    async _onClose(options) {
+      if (activeApp === this) activeApp = null;
+      return super._onClose?.(options);
+    }
+  }
+
+  return EmbedFrameApp;
 }
 
-function showEmbed(url) {
-  ensureOverlay();
-  overlayIframe.src = url;
-  overlayEl.style.display = 'block';
+function ensureAppClass() {
+  if (!EmbedFrameAppClass) EmbedFrameAppClass = buildAppClass();
+  return EmbedFrameAppClass;
 }
 
-function hideEmbed() {
-  if (!overlayEl) return;
-  overlayEl.style.display = 'none';
-  if (overlayIframe) overlayIframe.src = 'about:blank';
+function openOrUpdate(url, title) {
+  const Cls = ensureAppClass();
+  if (activeApp?.rendered) {
+    activeApp.setUrl(url, title);
+    activeApp.bringToTop?.();
+    return;
+  }
+  activeApp = new Cls({ url, embedTitle: title });
+  activeApp.render(true);
 }
 
-function reloadEmbed() {
-  if (!overlayIframe) return;
-  // Force reload by re-setting src
-  const src = overlayIframe.src;
-  overlayIframe.src = 'about:blank';
-  setTimeout(() => { overlayIframe.src = src; }, 50);
+function closeApp() {
+  if (!activeApp) return;
+  try { activeApp.close(); } catch (_) {}
+  activeApp = null;
+}
+
+function reloadApp() {
+  if (!activeApp?.rendered) return;
+  activeApp.reload();
 }
 
 export function handleEmbedOpen(msg) {
   const { payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
   if (senderId === game.user.id) return;
-  showEmbed(payload.url);
+  openOrUpdate(payload.url, payload.title);
 }
 
 export function handleEmbedClose(msg) {
   const { payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
   if (senderId === game.user.id) return;
-  hideEmbed();
+  closeApp();
 }
 
 export function handleEmbedReload(msg) {
   const { payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
   if (senderId === game.user.id) return;
-  reloadEmbed();
+  reloadApp();
 }

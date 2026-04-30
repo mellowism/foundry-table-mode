@@ -2,7 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
-## [0.6.0] — 2026-04-30
+## [0.6.1] — 2026-04-30
+
+### Changed — TV Embed renders in a Foundry window (not full-screen overlay)
+
+The TV embed now opens as a regular Foundry ApplicationV2 window — draggable, resizable, with the standard window header and close button. Foundry UI stays visible around it, just like a journal sheet. Better fit for the "in-game iframe" UX than the previous full-screen overlay.
+
+- Default size 900×1100 (PHB-page-ish aspect)
+- Title shows the journal page name
+- Close via X like any Foundry window
+- Reload toolbar button still works on the active window
+
+
 
 ### Added — TV Embed URL (live-update shop signs / handouts)
 

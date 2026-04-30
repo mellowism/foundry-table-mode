@@ -27,5 +27,6 @@
   "TABLE_MODE.EmbedUrl.FieldHint": "When set, the TV-icon pushes this URL as a full-screen iframe instead of opening the journal sheet on the VTT client. Use Homebrewery share links, image URLs, or any embeddable page.",
   "TABLE_MODE.EmbedUrl.NoUrlSet": "Table Mode: no embed URL set on this page.",
   "TABLE_MODE.EmbedUrl.NothingToReload": "Table Mode: no active TV embed to reload.",
-  "TABLE_MODE.EmbedUrl.Reloaded": "Table Mode: TV embed reloaded."
+  "TABLE_MODE.EmbedUrl.Reloaded": "Table Mode: TV embed reloaded.",
+  "TABLE_MODE.EmbedFrame.DefaultTitle": "Table Mode — Embed"
 }
