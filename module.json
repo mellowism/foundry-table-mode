@@ -2,7 +2,7 @@
   "id": "foundry-table-mode",
   "title": "Foundry Table Mode",
   "description": "Orchestration layer for in-person table-TV D&D setups. One GM toolbar controls viewport lock, display push, and mood presets on a dedicated VTT-user client.",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "compatibility": {
     "minimum": "13",
     "verified": "13"

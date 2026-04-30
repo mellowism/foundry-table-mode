@@ -2,34 +2,20 @@ import { MODULE_ID } from './socket-protocol.js';
 
 let NoteHUDClass = null;
 
+function visibilityTarget(noteDoc) {
+  return noteDoc?.page ?? noteDoc?.entry ?? null;
+}
+
 function buildNoteHUDClass() {
-  const Base =
-    foundry?.applications?.hud?.BasePlaceableHUD ??
-    globalThis.BasePlaceableHUD ??
-    null;
-  const HMixin =
-    foundry?.applications?.api?.HandlebarsApplicationMixin ??
-    globalThis.HandlebarsApplicationMixin ??
-    null;
-
-  if (!Base || !HMixin) {
-    console.error(`[${MODULE_ID}] Missing V13 HUD APIs — BasePlaceableHUD=${!!Base} HMixin=${!!HMixin}`);
-    return null;
-  }
-
-  function visibilityTarget(noteDoc) {
-    return noteDoc?.page ?? noteDoc?.entry ?? null;
-  }
+  const Base = foundry.applications.hud.BasePlaceableHUD;
+  const HMixin = foundry.applications.api.HandlebarsApplicationMixin;
 
   class NoteHUD extends HMixin(Base) {
     static async _onToggleVisibility(event) {
       event?.preventDefault?.();
       event?.stopPropagation?.();
       const target = visibilityTarget(this.document);
-      if (!target) {
-        console.warn(`[${MODULE_ID}] NoteHUD: no entry/page linked — cannot toggle`);
-        return;
-      }
+      if (!target) return;
       const LEVELS = CONST.DOCUMENT_OWNERSHIP_LEVELS;
       const ownership = foundry.utils.deepClone(target.ownership ?? {});
       const current = ownership.default ?? LEVELS.NONE;
@@ -75,12 +61,8 @@ function buildNoteHUDClass() {
     _updatePosition(position) {
       const out = super._updatePosition?.(position) ?? position;
       const iconSize = this.document?.iconSize ?? 40;
-      if (typeof out.left === 'number') {
-        out.left = out.left - (iconSize / 2);
-      }
-      if (typeof out.top === 'number') {
-        out.top = out.top - (iconSize / 2);
-      }
+      if (typeof out.left === 'number') out.left -= iconSize / 2;
+      if (typeof out.top === 'number') out.top -= iconSize / 2;
       return out;
     }
   }
@@ -89,19 +71,15 @@ function buildNoteHUDClass() {
 }
 
 export function installNoteHud() {
-  const NoteCls = foundry?.canvas?.placeables?.Note ?? globalThis.Note;
-  if (!NoteCls?.prototype) {
-    console.error(`[${MODULE_ID}] Note class not found — install aborted`);
-    return;
-  }
+  const NoteCls = foundry.canvas.placeables.Note;
 
   NoteCls.prototype._canHUD = function () {
     return game.user.isGM && !!this.document?.entryId;
   };
 
-  // Override right-click directly. Default Foundry impl assumes layer.hud is
-  // a non-null object — on some V13 builds NotesLayer.hud returns null and the
-  // default crashes silently. Bypass the layer indirection entirely.
+  // Default Foundry _onClickRight assumes layer.hud is non-null. On some V13
+  // builds NotesLayer.hud returns null, which crashes the default impl. Bind
+  // canvas.hud.note ourselves to bypass the layer indirection.
   NoteCls.prototype._onClickRight = function (event) {
     if (!this._canHUD?.(game.user, event)) return;
     const hud = canvas?.hud?.note;
@@ -109,22 +87,63 @@ export function installNoteHud() {
     if (hud.object === this) hud.clear();
     else hud.bind(this);
   };
-  // V13 also dispatches via _onClickRight2 in some cases (double-right) —
-  // alias to the same handler so we don't lose binds on rapid clicks.
-  NoteCls.prototype._onClickRight2 = NoteCls.prototype._onClickRight;
-
-  console.log(`[${MODULE_ID}] NoteHUD install: _canHUD + _onClickRight patched on Note.prototype`);
 }
 
 export function onCanvasReady() {
-  console.log(`[${MODULE_ID}] NoteHUD canvasReady — canvas.hud=${!!canvas?.hud} existing.note=${!!canvas?.hud?.note}`);
   if (!canvas?.hud || canvas.hud.note) return;
   if (!NoteHUDClass) NoteHUDClass = buildNoteHUDClass();
   if (!NoteHUDClass) return;
   try {
     canvas.hud.note = new NoteHUDClass();
-    console.log(`[${MODULE_ID}] canvas.hud.note assigned: ${canvas.hud.note?.constructor?.name}`);
   } catch (e) {
     console.error(`[${MODULE_ID}] Failed to instantiate NoteHUD`, e);
   }
+}
+
+/**
+ * Toolbar action: toggle visibility of every map note on the current scene.
+ * Mirrors the per-note semantics — updates the linked page (or entry) ownership.
+ * If any target is visible, hides all. Otherwise shows all.
+ */
+export async function toggleAllVisibility() {
+  if (!game.user.isGM) return;
+  const notes = canvas?.notes?.placeables ?? [];
+  if (!notes.length) {
+    ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.NoNotes'));
+    return;
+  }
+
+  const targets = new Map();
+  for (const n of notes) {
+    const t = visibilityTarget(n.document);
+    if (t && !targets.has(t.id)) targets.set(t.id, t);
+  }
+
+  if (!targets.size) {
+    ui.notifications.warn(game.i18n.localize('TABLE_MODE.Notifications.NoLinkedEntries'));
+    return;
+  }
+
+  const LEVELS = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+  const anyVisible = [...targets.values()].some(
+    t => (t.ownership?.default ?? LEVELS.NONE) >= LEVELS.OBSERVER
+  );
+  const newLevel = anyVisible ? LEVELS.NONE : LEVELS.OBSERVER;
+
+  try {
+    await Promise.all([...targets.values()].map(t => {
+      const ownership = foundry.utils.deepClone(t.ownership ?? {});
+      ownership.default = newLevel;
+      return t.update({ ownership });
+    }));
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Bulk visibility toggle failed`, e);
+    ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.BulkToggleFailed'));
+    return;
+  }
+
+  const key = anyVisible ? 'TABLE_MODE.Notifications.NotesHidden' : 'TABLE_MODE.Notifications.NotesShown';
+  ui.notifications.info(game.i18n.format(key, { count: targets.size }));
+
+  if (canvas.hud.note?.rendered) canvas.hud.note.render();
 }

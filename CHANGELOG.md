@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.4] — 2026-04-30
+
+### Added — Toggle All Map Notes (toolbar)
+
+New tool in the Table Mode toolbar (eye icon). Click to toggle player visibility for every map note on the current scene. If any note is visible, hides them all; otherwise shows them all. Uses the same per-note semantics — updates the linked page (or entry) ownership.
+
+### Cleanup
+
+- Removed `_onClickRight2` alias on Note prototype (speculative defensive code from debugging — never confirmed needed).
+- Removed `globalThis.*` fallbacks for V13 APIs (foundry.applications.* is always present in V13).
+- Removed happy-path console logs from install + canvasReady + assignment. Error logs remain.
+
 ## [0.5.3] — 2026-04-29
 
 ### Fixed

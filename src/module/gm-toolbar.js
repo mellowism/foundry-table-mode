@@ -2,6 +2,7 @@ import { MODULE_ID } from './socket-protocol.js';
 import { syncOnce } from './viewport-controller.js';
 import { toggleViewbox, isEnabled as isViewboxEnabled } from './viewbox-controller.js';
 import { reloadVtt } from './client-actions.js';
+import { toggleAllVisibility as toggleAllNotes } from './note-hud.js';
 
 function t(key) { return game.i18n.localize(key); }
 
@@ -39,6 +40,13 @@ export function registerSceneControls() {
           icon: 'fas fa-sync',
           button: true,
           onChange: () => reloadVtt()
+        },
+        toggleNotes: {
+          name: 'toggleNotes',
+          title: t('TABLE_MODE.Controls.ToggleAllNotes'),
+          icon: 'fas fa-eye',
+          button: true,
+          onChange: () => toggleAllNotes()
         }
       }
     };

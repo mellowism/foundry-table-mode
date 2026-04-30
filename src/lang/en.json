@@ -15,5 +15,11 @@
   "TABLE_MODE.Notifications.Synced": "Table Mode: viewport synced to VTT.",
   "TABLE_MODE.Notifications.ReloadSent": "Table Mode: reload command sent to VTT client.",
   "TABLE_MODE.Journal.Toggle": "Show / Hide on VTT",
-  "TABLE_MODE.NoteHud.ToggleVis": "Toggle Player Visibility"
+  "TABLE_MODE.NoteHud.ToggleVis": "Toggle Player Visibility",
+  "TABLE_MODE.Controls.ToggleAllNotes": "Toggle Visibility — All Map Notes",
+  "TABLE_MODE.Notifications.NoNotes": "Table Mode: no map notes on this scene.",
+  "TABLE_MODE.Notifications.NoLinkedEntries": "Table Mode: no map notes have a linked journal entry.",
+  "TABLE_MODE.Notifications.BulkToggleFailed": "Table Mode: bulk note toggle failed — see console.",
+  "TABLE_MODE.Notifications.NotesHidden": "Table Mode: hidden {count} note target(s) from players.",
+  "TABLE_MODE.Notifications.NotesShown": "Table Mode: shown {count} note target(s) to players."
 }
