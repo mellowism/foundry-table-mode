@@ -115,9 +115,9 @@ let EmbedFrameAppClass = null;
 let activeApp = null;
 
 function buildAppClass() {
-  const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+  const { ApplicationV2 } = foundry.applications.api;
 
-  class EmbedFrameApp extends HandlebarsApplicationMixin(ApplicationV2) {
+  class EmbedFrameApp extends ApplicationV2 {
     static DEFAULT_OPTIONS = {
       id: `${MODULE_ID}-embed-frame`,
       classes: ['table-mode-embed-frame'],
@@ -133,17 +133,11 @@ function buildAppClass() {
       }
     };
 
-    static PARTS = {
-      content: {
-        template: `modules/${MODULE_ID}/src/templates/embed-frame.html`,
-        root: true
-      }
-    };
-
     constructor(options = {}) {
-      super(options);
-      this._url = options.url ?? '';
-      this._title = options.embedTitle ?? t('TABLE_MODE.EmbedFrame.DefaultTitle');
+      const { url, embedTitle, ...rest } = options;
+      super(rest);
+      this._url = url ?? '';
+      this._title = embedTitle ?? t('TABLE_MODE.EmbedFrame.DefaultTitle');
     }
 
     get title() { return this._title; }
@@ -162,8 +156,13 @@ function buildAppClass() {
       setTimeout(() => { iframe.src = src; }, 50);
     }
 
-    async _prepareContext() {
-      return { url: this._url || 'about:blank' };
+    async _renderHTML(_context, _options) {
+      const safe = String(this._url || 'about:blank').replaceAll('"', '&quot;');
+      return `<iframe class="table-mode-embed-iframe" src="${safe}" allow="fullscreen"></iframe>`;
+    }
+
+    _replaceHTML(html, content, _options) {
+      content.innerHTML = html;
     }
 
     async _onClose(options) {

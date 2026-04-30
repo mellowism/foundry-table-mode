@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.2] — 2026-05-01
+
+### Fixed — TV Embed iframe was empty
+
+The iframe inside the embed window rendered with no `src` attribute — the URL never reached the template via HandlebarsApplicationMixin's part-context plumbing in V13. Switched the embed window to raw `ApplicationV2` with `_renderHTML` / `_replaceHTML` returning the iframe HTML directly with `src` baked in. No template file involved.
+
 ## [0.6.1] — 2026-04-30
 
 ### Changed — TV Embed renders in a Foundry window (not full-screen overlay)
