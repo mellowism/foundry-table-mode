@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.5] — 2026-04-30
+
+### Fixed — Release zip path separators
+
+Earlier release zips used Windows-style backslash separators in archive entry names (e.g. `dist\table-mode.js`). The ZIP spec mandates forward slashes — backslashes are non-portable and cause unreliable extraction on Linux Foundry installs. Re-release with forward slashes only. No code changes.
+
+This explains intermittent Linux Foundry update failures since v0.5.0 (works locally on Windows because Windows tooling normalizes both).
+
 ## [0.5.4] — 2026-04-30
 
 ### Added — Toggle All Map Notes (toolbar)
