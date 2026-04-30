@@ -2,6 +2,28 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.0] — 2026-04-30
+
+### Added — TV Embed URL (live-update shop signs / handouts)
+
+Push any URL as a full-screen iframe to the VTT client. Designed for displaying GMBinder/Homebrewery share links, image hosts, or any embeddable page edge-to-edge on the table TV with no Foundry chrome.
+
+**Authoring:**
+- Open any text journal page → new "Push to TV as iframe" field at top of edit form
+- Paste URL (e.g. `https://homebrewery.naturalcrit.com/share/xxx`) → save
+- The TV-icon in the journal header now pushes this URL instead of the journal sheet
+
+**Play:**
+- Click TV-icon → full-screen iframe overlay on VTT client (z-index 9999)
+- Click again → close overlay
+- New "Reload TV Embed" toolbar button — refreshes the iframe (use after editing the source page externally to pick up changes)
+
+**Live-update workflow:** Edit shop sign on Homebrewery → save → click "Reload TV Embed" in Foundry → players see new version immediately. No PDF/PNG export step.
+
+### Socket protocol
+
+- Added `embed.open`, `embed.close`, `embed.reload` message types.
+
 ## [0.5.7] — 2026-04-30
 
 ### Build / Infra

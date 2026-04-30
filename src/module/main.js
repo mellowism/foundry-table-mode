@@ -21,6 +21,12 @@ import {
   handleJournalState
 } from './journal-push.js';
 import { installNoteHud, onCanvasReady as onNoteHudCanvasReady } from './note-hud.js';
+import {
+  onRenderJournalPageSheet as onRenderEmbedPageSheet,
+  handleEmbedOpen,
+  handleEmbedClose,
+  handleEmbedReload
+} from './embed-url.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 
@@ -52,6 +58,12 @@ Hooks.once('ready', () => {
           handleJournalClose(msg); break;
         case MSG.JOURNAL_STATE:
           handleJournalState(msg); break;
+        case MSG.EMBED_OPEN:
+          handleEmbedOpen(msg); break;
+        case MSG.EMBED_CLOSE:
+          handleEmbedClose(msg); break;
+        case MSG.EMBED_RELOAD:
+          handleEmbedReload(msg); break;
       }
     } catch (e) {
       console.error(`[${MODULE_ID}] socket handler error`, e);
@@ -84,6 +96,11 @@ Hooks.on('renderJournalEntrySheet', (app, html) => {
   onVttJournalRender(app);
 });
 Hooks.on('renderJournalPageSheet', onRenderJournalSheet);
+
+// Page-sheet UI: inject "TV Embed URL" field on text page sheets
+Hooks.on('renderJournalTextPageSheet', onRenderEmbedPageSheet);
+Hooks.on('renderJournalPageSheet', onRenderEmbedPageSheet);
+Hooks.on('renderJournalEntryPageSheet', onRenderEmbedPageSheet);
 
 // VTT-side: detect user-initiated close so we can notify GM
 Hooks.on('closeJournalSheet', onVttJournalClose);

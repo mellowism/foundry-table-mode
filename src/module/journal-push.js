@@ -1,5 +1,6 @@
 import { MODULE_ID, SOCKET_NAME, MSG } from './socket-protocol.js';
 import { getVttUserId } from './settings.js';
+import { toggleEmbedOnVtt, isEmbedActive } from './embed-url.js';
 
 /** GM-side: Map<journalId, { pageId?, anchor? }> — journals currently open on VTT */
 const openOnVtt = new Map();
@@ -104,6 +105,13 @@ export function onRenderJournalSheet(app, html) {
     ev.preventDefault();
     ev.stopPropagation();
     const { pageId, anchor } = currentPageInfo(app);
+    // If current page has an embed URL, route to iframe push instead of journal-sheet push
+    const page = pageId ? doc.pages?.get(pageId) : null;
+    const embedUrl = page?.getFlag?.(MODULE_ID, 'embedUrl') || page?.flags?.[MODULE_ID]?.embedUrl;
+    if (embedUrl) {
+      toggleEmbedOnVtt(page);
+      return;
+    }
     toggleJournalOnVtt(doc.id, pageId, anchor);
   });
 
