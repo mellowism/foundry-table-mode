@@ -14,6 +14,33 @@ function getEmbedUrl(page) {
   return page?.getFlag?.(FLAG_SCOPE, FLAG_KEY) || page?.flags?.[FLAG_SCOPE]?.[FLAG_KEY] || '';
 }
 
+/**
+ * Normalize URL for embedding. Currently:
+ *  - Rewrite Homebrewery `/share/{id}` → `/print/{id}` (chrome-less variant).
+ */
+function normalizeEmbedUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'homebrewery.naturalcrit.com' && u.pathname.startsWith('/share/')) {
+      u.pathname = '/print/' + u.pathname.slice('/share/'.length);
+      return u.toString();
+    }
+  } catch (_) { /* not a parseable URL — return as-is */ }
+  return url;
+}
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)(\?|#|$)/i;
+function isImageUrl(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return IMAGE_EXT_RE.test(u.pathname);
+  } catch (_) {
+    return IMAGE_EXT_RE.test(url);
+  }
+}
+
 /* =========================================================
  * GM-side state
  * ========================================================= */
@@ -31,8 +58,8 @@ export async function toggleEmbedOnVtt(page) {
     ui.notifications.warn(t('TABLE_MODE.Notifications.NoVttUser'));
     return;
   }
-  const url = getEmbedUrl(page);
-  if (!url) {
+  const rawUrl = getEmbedUrl(page);
+  if (!rawUrl) {
     ui.notifications.warn(t('TABLE_MODE.EmbedUrl.NoUrlSet'));
     return;
   }
@@ -42,6 +69,7 @@ export async function toggleEmbedOnVtt(page) {
     refreshSheets(page);
     return;
   }
+  const url = normalizeEmbedUrl(rawUrl);
   const title = page.name || page.parent?.name || 'Embed';
   emit(MSG.EMBED_OPEN, { pageId: page.id, url, title, targetUserId });
   activeEmbed = { pageId: page.id, url, title };
@@ -157,7 +185,11 @@ function buildAppClass() {
     }
 
     async _renderHTML(_context, _options) {
-      const safe = String(this._url || 'about:blank').replaceAll('"', '&quot;');
+      const url = this._url || 'about:blank';
+      const safe = String(url).replaceAll('"', '&quot;');
+      if (isImageUrl(url)) {
+        return `<div class="table-mode-embed-image-wrap"><img src="${safe}" alt=""/></div>`;
+      }
       return `<iframe class="table-mode-embed-iframe" src="${safe}" allow="fullscreen"></iframe>`;
     }
 

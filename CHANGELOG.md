@@ -2,6 +2,13 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.3] — 2026-05-01
+
+### Added — Smarter URL handling for TV Embed
+
+- **Auto-rewrite Homebrewery share URLs** to the chrome-less `/print/` variant (was: `/share/{id}` showed NaturalCrit toolbar + notice popup; now: `/print/{id}` renders the brew directly). Paste either URL form — we normalize automatically.
+- **Image URLs (`.png/.jpg/.gif/.webp/.svg/.avif/.bmp/.ico`) now render as a centered `<img>`** with `object-fit: contain` on black background, instead of a top-left-anchored iframe with white background. Use for NPC portraits, scene reveals, monster art, etc.
+
 ## [0.6.2] — 2026-05-01
 
 ### Fixed — TV Embed iframe was empty
