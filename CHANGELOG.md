@@ -2,6 +2,15 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.6] — 2026-04-30
+
+### Build / Infra
+
+- **Versioned bundle filename:** `dist/table-mode-v{version}.js`. Solves CDN/browser-cache hell — every release has a unique URL so caches can't serve a stale module. Single source of truth: `package.json` version drives both the bundle filename and `module.json` (synced via `scripts/sync-manifest.mjs` post-rollup).
+- `npm run build` now: clean `dist/` → rollup → sync `module.json`. One command, always consistent.
+
+No code changes.
+
 ## [0.5.5] — 2026-04-30
 
 ### Fixed — Release zip path separators
