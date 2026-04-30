@@ -1,13 +1,14 @@
 {
   "name": "foundry-table-mode",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Foundry VTT V13 module — orchestration for in-person table-TV setups.",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "rimraf dist && rollup -c && node scripts/sync-manifest.mjs",
     "watch": "rollup -c -w",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "rollup": "^4.24.0",

@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.5.7] — 2026-04-30
+
+### Build / Infra
+
+- **One-command release:** `npm run release` does build → zip → commit → push → gh release. Pre-flight checks (on main, tag doesn't exist, CHANGELOG has matching entry).
+- Extracted `build-zip.ps1` from manual PowerShell command — single source of truth for zip layout (forward-slash paths, includes dist/src/manifest/readme/license/changelog).
+- Release notes auto-extracted from CHANGELOG section for the version.
+
+No code changes.
+
 ## [0.5.6] — 2026-04-30
 
 ### Build / Infra
