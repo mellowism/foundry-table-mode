@@ -2,7 +2,15 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
-## [0.6.10] — 2026-05-01
+## [0.7.0] — 2026-05-01
+
+### Added — Hide GM cursor on VTT
+
+New module setting **"Hide GM cursor on VTT"** (default: on). Suppresses the GM's mouse cursor and ruler on the VTT client. Players sitting at the table don't see the GM dragging their cursor around while prepping the next reveal. Pings remain visible — so the GM can still draw attention to specific spots, intentionally.
+
+Implemented via `userActivity` hook + `canvasReady` sweep on the VTT client. For each GM user's activity, we set `cursor.visible = false` after Foundry processes the update.
+
+
 
 ### Fixed
 

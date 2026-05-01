@@ -27,8 +27,14 @@ import {
   handleEmbedClose,
   handleEmbedReload
 } from './embed-url.js';
+import {
+  onUserActivity as onHideGmCursorUserActivity,
+  onCanvasReady as onHideGmCursorCanvasReady,
+  onSettingChange as onHideGmCursorSettingChange
+} from './hide-gm-cursor.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
+const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -84,7 +90,10 @@ Hooks.on('updateSetting', (setting) => {
   const shortKey = key.slice(`${MODULE_ID}.`.length);
   if (shortKey === 'vttAspect') applyAspectNow();
   if (UI_SETTING_KEYS.has(shortKey)) applyUiCleanup();
+  if (GM_CURSOR_SETTING_KEYS.has(shortKey)) onHideGmCursorSettingChange();
 });
+
+Hooks.on('userActivity', onHideGmCursorUserActivity);
 
 // Journal header button — inject on render. Try several hook names for V13 variants.
 Hooks.on('renderJournalSheet', (app, html) => {
@@ -109,6 +118,7 @@ Hooks.on('closeJournalEntrySheet', onVttJournalClose);
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));
   onNoteHudCanvasReady();
+  onHideGmCursorCanvasReady();
 });
 
 Hooks.on('canvasTearDown', () => {

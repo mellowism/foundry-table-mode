@@ -4,7 +4,8 @@ export const SETTINGS = {
   VTT_USER_ID: 'vttUserId',
   ANIMATION_DURATION: 'animationDuration',
   VTT_ASPECT: 'vttAspect',
-  HIDE_UI: 'hideUi'
+  HIDE_UI: 'hideUi',
+  HIDE_GM_CURSOR: 'hideGmCursor'
 };
 
 const ASPECT_PRESETS = {
@@ -59,6 +60,13 @@ export function registerSettings() {
     scope: 'world', config: true, type: Boolean,
     default: false, requiresReload: false
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.HIDE_GM_CURSOR, {
+    name: game.i18n.localize('TABLE_MODE.Settings.HideGmCursor.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.HideGmCursor.Hint'),
+    scope: 'world', config: true, type: Boolean,
+    default: true, requiresReload: false
+  });
 }
 
 export function getVttUserId() {
@@ -73,4 +81,7 @@ export function getAspectOverride() {
 }
 export function isHideUiEnabled() {
   return game.settings.get(MODULE_ID, SETTINGS.HIDE_UI);
+}
+export function isHideGmCursorEnabled() {
+  return game.settings.get(MODULE_ID, SETTINGS.HIDE_GM_CURSOR);
 }

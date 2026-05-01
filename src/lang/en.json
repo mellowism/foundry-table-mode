@@ -11,6 +11,8 @@
   "TABLE_MODE.Settings.AnimationDuration.Hint": "Duration of the pan/zoom animation when the VTT client receives a viewport sync.",
   "TABLE_MODE.Settings.HideUi.Name": "Hide VTT UI (minimal canvas view)",
   "TABLE_MODE.Settings.HideUi.Hint": "Hides all UI chrome on the VTT client — sidebar, chat, scene navigation, player list, hotbar, scene controls, logo, pause indicator. Applies to the VTT client only. GM UI is not affected.",
+  "TABLE_MODE.Settings.HideGmCursor.Name": "Hide GM cursor on VTT",
+  "TABLE_MODE.Settings.HideGmCursor.Hint": "Suppresses the GM's cursor and ruler on the VTT client. Players don't see the GM's mouse moving across the table TV. Pings remain visible (so the GM can still draw attention to specific spots). Applies to the VTT client only.",
   "TABLE_MODE.Notifications.NoVttUser": "Table Mode: no VTT user selected. Set one in module settings first.",
   "TABLE_MODE.Notifications.Synced": "Table Mode: viewport synced to VTT.",
   "TABLE_MODE.Notifications.ReloadSent": "Table Mode: reload command sent to VTT client.",
