@@ -2,6 +2,17 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.7.1] — 2026-05-01
+
+### Fixed — Hide GM cursor actually works now
+
+The 0.7.0 implementation hooked `userActivity` to hide GM-cursor visuals — but that hook doesn't fire in V13 builds we tested. Also, V13's `canvas.controls.cursors` children have no `.user` link, so per-user filtering wasn't possible. New approach:
+
+- **Poll-based:** 150ms `setInterval` re-hides cursors while active. Lightweight (one iterator pass over typically 1–2 children).
+- **Hides ALL cursor children**, not just GM. The VTT client is a table TV — players watching it have no reason to see anyone's mouse pointer. Acceptable simplification.
+- Pings still rendered separately and remain visible.
+- Polling stops automatically when setting toggles off, when user is not the active VTT user, or when canvas tears down.
+
 ## [0.7.0] — 2026-05-01
 
 ### Added — Hide GM cursor on VTT
