@@ -158,8 +158,8 @@ function buildAppClass() {
         contentClasses: ['table-mode-embed-frame-content']
       },
       position: {
-        width: 920,
-        height: 1180
+        width: 1024,
+        height: 1200
       }
     };
 

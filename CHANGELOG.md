@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.7] — 2026-05-01
+
+### Changed
+
+- **Default embed window 1024×1200** (from 920×1180). Eliminates horizontal scrollbar that appeared on Homebrewery PHB-format brews at narrower widths. Defaults matter — the goal is that the GM never has to touch the VTT machine to resize.
+
 ## [0.6.6] — 2026-05-01
 
 ### Changed
