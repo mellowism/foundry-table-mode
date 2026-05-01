@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.7.3] — 2026-05-01
+
+### Fixed — Settings-not-registered error cascade
+
+The 0.7.2 cursor patches read `vttUserId` and `hideGmCursor` settings from inside `ControlsLayer.prototype.updateCursor`. But Foundry applies buffered `userActivity` socket events BEFORE the `ready` hook fires (and our settings register at `ready`). Result: every cursor update threw "setting is not a registered game setting", which cascaded through Foundry's hook system and broke viewbox, ping, and other features that depend on the same handler chain.
+
+Wrap settings reads in try/catch. If settings aren't registered yet (early lifecycle), return `false` from `shouldSuppress` — patches let calls through normally. Once `ready` fires and settings are registered, suppression kicks in.
+
 ## [0.7.2] — 2026-05-01
 
 ### Fixed — Hide GM cursor: no more flicker

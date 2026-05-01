@@ -19,9 +19,17 @@ import { getVttUserId, isHideGmCursorEnabled } from './settings.js';
 let patched = false;
 
 function shouldSuppress() {
-  if (game?.user?.isGM) return false;
-  if (game?.user?.id !== getVttUserId()) return false;
-  if (!isHideGmCursorEnabled()) return false;
+  if (!game?.user || game.user.isGM) return false;
+  // Settings register in `ready` (vttUserId needs game.users.contents which
+  // isn't populated at init). updateCursor patches run as soon as Foundry
+  // applies buffered userActivity socket events, which can be before ready.
+  // Tolerate the gap: if settings aren't registered yet, just don't suppress.
+  try {
+    if (game.user.id !== getVttUserId()) return false;
+    if (!isHideGmCursorEnabled()) return false;
+  } catch (_) {
+    return false;
+  }
   return true;
 }
 
