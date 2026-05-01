@@ -2,76 +2,70 @@ import { MODULE_ID } from './socket-protocol.js';
 import { getVttUserId, isHideGmCursorEnabled } from './settings.js';
 
 /**
- * Hide cursors on the dedicated VTT-display client.
+ * Hide other users' cursors on the dedicated VTT-display client.
  *
- * V13 cursor architecture:
- *  - `canvas.controls.cursors` is a PIXI UnboundContainer holding Cursor
- *    instances as children. There's no `.user` link on the children, and
- *    `game.users` doesn't expose a `.cursor` property — so we can't filter
- *    GM-only here. We just hide ALL cursor children. Acceptable because the
- *    VTT client is a table TV — other players watching it have no reason to
- *    see anyone's mouse cursor.
- *  - Pings are rendered separately, so they remain visible.
- *  - `userActivity` hook does not fire in V13. We poll instead.
+ * Approach (inspired by Azzurite's cursor-hider): patch
+ *   - ControlsLayer.prototype.updateCursor
+ *   - ControlsLayer.prototype.updateRuler
+ * to early-return when this client should hide cursors. The cursor is then
+ * never drawn — no flicker, no per-frame work.
+ *
+ * Pings render through a separate path and remain visible.
+ *
+ * Hides ALL cursors (not just GM's): the VTT client is a table TV, the
+ * audience sitting at the table doesn't need to see anyone's mouse pointer.
  */
 
-let pollHandle = null;
-const POLL_MS = 150;
+let patched = false;
 
-function isActiveVttUser() {
-  return !game.user.isGM && game.user.id === getVttUserId();
+function shouldSuppress() {
+  if (game?.user?.isGM) return false;
+  if (game?.user?.id !== getVttUserId()) return false;
+  if (!isHideGmCursorEnabled()) return false;
+  return true;
 }
 
-function hideAllCursors() {
-  const container = canvas?.controls?.cursors;
-  if (!container?.children) return;
-  for (const c of container.children) {
-    if (c) c.visible = false;
+export function installCursorPatches() {
+  if (patched) return;
+  const Cls = foundry?.canvas?.layers?.ControlsLayer;
+  if (!Cls?.prototype) {
+    console.warn(`[${MODULE_ID}] ControlsLayer not found — hide-cursor inactive`);
+    return;
+  }
+  patched = true;
+
+  const origUpdateCursor = Cls.prototype.updateCursor;
+  if (typeof origUpdateCursor === 'function') {
+    Cls.prototype.updateCursor = function (...args) {
+      if (shouldSuppress()) return;
+      return origUpdateCursor.apply(this, args);
+    };
+  }
+
+  const origUpdateRuler = Cls.prototype.updateRuler;
+  if (typeof origUpdateRuler === 'function') {
+    Cls.prototype.updateRuler = function (...args) {
+      if (shouldSuppress()) return;
+      return origUpdateRuler.apply(this, args);
+    };
   }
 }
 
-function showAllCursors() {
+function removeExistingCursors() {
   const container = canvas?.controls?.cursors;
-  if (!container?.children) return;
-  for (const c of container.children) {
-    if (c) c.visible = true;
-  }
-}
-
-function startPolling() {
-  if (pollHandle != null) return;
-  pollHandle = setInterval(() => {
-    if (!isActiveVttUser() || !isHideGmCursorEnabled()) {
-      stopPolling();
-      return;
-    }
-    hideAllCursors();
-  }, POLL_MS);
-}
-
-function stopPolling() {
-  if (pollHandle == null) return;
-  clearInterval(pollHandle);
-  pollHandle = null;
+  if (!container?.removeChildren) return;
+  container.removeChildren();
 }
 
 export function onCanvasReady() {
-  if (!isActiveVttUser()) return;
-  if (!isHideGmCursorEnabled()) return;
-  hideAllCursors();
-  startPolling();
+  if (shouldSuppress()) removeExistingCursors();
 }
 
 export function onSettingChange() {
-  if (!isActiveVttUser()) return;
-  if (isHideGmCursorEnabled()) {
-    hideAllCursors();
-    startPolling();
-  } else {
-    stopPolling();
-    showAllCursors();
-  }
+  if (shouldSuppress()) removeExistingCursors();
+  // When toggled OFF: nothing to do — next mouse move will redraw cursor
+  // through the (now pass-through) patched method.
 }
 
-// Kept for backward-compat with main.js wiring (no-op now).
+// no-op kept for main.js compat
 export function onUserActivity() {}

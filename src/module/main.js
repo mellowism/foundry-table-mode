@@ -28,9 +28,9 @@ import {
   handleEmbedReload
 } from './embed-url.js';
 import {
-  onUserActivity as onHideGmCursorUserActivity,
   onCanvasReady as onHideGmCursorCanvasReady,
-  onSettingChange as onHideGmCursorSettingChange
+  onSettingChange as onHideGmCursorSettingChange,
+  installCursorPatches
 } from './hide-gm-cursor.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
@@ -40,6 +40,7 @@ Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
   registerSceneControls();
   installNoteHud();
+  installCursorPatches();
 });
 
 Hooks.once('ready', () => {
@@ -93,7 +94,6 @@ Hooks.on('updateSetting', (setting) => {
   if (GM_CURSOR_SETTING_KEYS.has(shortKey)) onHideGmCursorSettingChange();
 });
 
-Hooks.on('userActivity', onHideGmCursorUserActivity);
 
 // Journal header button — inject on render. Try several hook names for V13 variants.
 Hooks.on('renderJournalSheet', (app, html) => {

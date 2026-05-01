@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.7.2] — 2026-05-01
+
+### Fixed — Hide GM cursor: no more flicker
+
+The 0.7.1 polling approach flickered: cursor was redrawn between hide-passes. New approach (inspired by Azzurite's cursor-hider): patch `ControlsLayer.prototype.updateCursor` and `updateRuler` so they early-return when this client should hide cursors. The cursor is **never drawn** in the first place — no flicker, no per-frame work.
+
+`canvas.controls.cursors.removeChildren()` once on canvasReady (and on setting flip-on) cleans up any pre-existing cursor elements.
+
 ## [0.7.1] — 2026-05-01
 
 ### Fixed — Hide GM cursor actually works now
