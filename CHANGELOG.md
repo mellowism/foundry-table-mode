@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.8] — 2026-05-01
+
+### Removed
+
+- **"Reload TV Embed" toolbar button.** Same effect can be achieved by clicking the journal TV-icon twice (close + open) which reloads the iframe. Marginal benefit didn't justify the toolbar slot. Easy to add back if needed.
+
 ## [0.6.7] — 2026-05-01
 
 ### Changed

@@ -22,7 +22,6 @@
   "TABLE_MODE.Notifications.BulkToggleFailed": "Table Mode: bulk note toggle failed — see console.",
   "TABLE_MODE.Notifications.NotesHidden": "Table Mode: hidden {count} note target(s) from players.",
   "TABLE_MODE.Notifications.NotesShown": "Table Mode: shown {count} note target(s) to players.",
-  "TABLE_MODE.Controls.ReloadEmbed": "Reload TV Embed (after Homebrewery edits, etc.)",
   "TABLE_MODE.EmbedUrl.FieldLabel": "Push to TV as iframe (overrides journal push)",
   "TABLE_MODE.EmbedUrl.FieldHint": "When set, the TV-icon pushes this URL as a full-screen iframe instead of opening the journal sheet on the VTT client. Use Homebrewery share links, image URLs, or any embeddable page.",
   "TABLE_MODE.EmbedUrl.NoUrlSet": "Table Mode: no embed URL set on this page.",

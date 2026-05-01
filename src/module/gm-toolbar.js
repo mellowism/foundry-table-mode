@@ -3,7 +3,6 @@ import { syncOnce } from './viewport-controller.js';
 import { toggleViewbox, isEnabled as isViewboxEnabled } from './viewbox-controller.js';
 import { reloadVtt } from './client-actions.js';
 import { toggleAllVisibility as toggleAllNotes } from './note-hud.js';
-import { reloadEmbedOnVtt } from './embed-url.js';
 
 function t(key) { return game.i18n.localize(key); }
 
@@ -48,13 +47,6 @@ export function registerSceneControls() {
           icon: 'fas fa-eye',
           button: true,
           onChange: () => toggleAllNotes()
-        },
-        reloadEmbed: {
-          name: 'reloadEmbed',
-          title: t('TABLE_MODE.Controls.ReloadEmbed'),
-          icon: 'fas fa-arrows-rotate',
-          button: true,
-          onChange: () => reloadEmbedOnVtt()
         }
       }
     };
