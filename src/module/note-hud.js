@@ -61,11 +61,10 @@ function buildNoteHUDClass() {
     _updatePosition(position) {
       const out = super._updatePosition?.(position) ?? position;
       const iconSize = this.document?.iconSize ?? 40;
-      // Place HUD just above the note icon so right-clicking the note itself
-      // remains possible (HUD wrapper is pointer-events:none anyway, but
-      // visually clearer too).
-      if (typeof out.left === 'number') out.left -= 18; // half of 36px button
-      if (typeof out.top === 'number') out.top -= iconSize / 2 + 40;
+      // Place HUD overlapping the upper-left of the note icon. Wrapper has
+      // pointer-events:none so the note remains right-clickable underneath.
+      if (typeof out.left === 'number') out.left -= iconSize / 2;
+      if (typeof out.top === 'number') out.top -= iconSize / 2;
       return out;
     }
   }
@@ -83,17 +82,28 @@ export function installNoteHud() {
   // Default Foundry _onClickRight assumes layer.hud is non-null. On some V13
   // builds NotesLayer.hud returns null, which crashes the default impl. Bind
   // canvas.hud.note ourselves to bypass the layer indirection.
-  NoteCls.prototype._onClickRight = function (event) {
+  // We must preventDefault + stopPropagation, otherwise V13's right-button
+  // pan-drag gesture continues and the canvas drags around even after our
+  // handler runs.
+  const handleRight = function (event) {
     if (!this._canHUD?.(game.user, event)) return;
     const hud = canvas?.hud?.note;
     if (!hud) return;
     if (hud.object === this) {
-      // V13: BasePlaceableHUD#clear is deprecated in favor of #close
       (hud.close ?? hud.clear).call(hud);
     } else {
       hud.bind(this);
     }
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (event?.data?.originalEvent) {
+      event.data.originalEvent.preventDefault?.();
+      event.data.originalEvent.stopPropagation?.();
+    }
+    return false;
   };
+  NoteCls.prototype._onClickRight = handleRight;
+  NoteCls.prototype._onClickRight2 = handleRight;
 }
 
 export function onCanvasReady() {

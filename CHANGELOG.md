@@ -2,6 +2,13 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.10] — 2026-05-01
+
+### Fixed
+
+- **Right-click on note no longer triggers canvas pan-drag.** V13's right-mouse-button starts a pan gesture on pointerdown — our handler ran on the completed click but didn't `preventDefault`, so the pan continued running and the user couldn't release the canvas. Now we call `preventDefault` + `stopPropagation` on both the PIXI event and the underlying browser event, and override both `_onClickRight` and `_onClickRight2` (V13 uses the latter for completed clicks on placeables).
+- **HUD position back to overlapping upper-left of note** (was hovering too far above in 0.6.9). Wrapper is `pointer-events: none` so the note remains right-clickable underneath; only the eye-button captures clicks.
+
 ## [0.6.9] — 2026-05-01
 
 ### Fixed
