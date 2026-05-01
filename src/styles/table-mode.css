@@ -1,8 +1,10 @@
 /* Foundry Table Mode — styles */
 
 /* Map Note quick-toggle HUD (right-click a map note as GM) */
+/* Wrapper is pointer-transparent so right-clicks fall through to the note
+   placeable underneath; only the actual button captures clicks. */
 .table-mode-note-hud {
-  pointer-events: all;
+  pointer-events: none;
   display: flex;
   flex-direction: row;
   gap: 4px;
@@ -21,6 +23,7 @@
 }
 
 .table-mode-note-hud .control-icon {
+  pointer-events: auto;
   width: 36px;
   height: 36px;
   display: flex;

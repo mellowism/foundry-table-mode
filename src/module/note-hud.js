@@ -61,8 +61,11 @@ function buildNoteHUDClass() {
     _updatePosition(position) {
       const out = super._updatePosition?.(position) ?? position;
       const iconSize = this.document?.iconSize ?? 40;
-      if (typeof out.left === 'number') out.left -= iconSize / 2;
-      if (typeof out.top === 'number') out.top -= iconSize / 2;
+      // Place HUD just above the note icon so right-clicking the note itself
+      // remains possible (HUD wrapper is pointer-events:none anyway, but
+      // visually clearer too).
+      if (typeof out.left === 'number') out.left -= 18; // half of 36px button
+      if (typeof out.top === 'number') out.top -= iconSize / 2 + 40;
       return out;
     }
   }
@@ -84,8 +87,12 @@ export function installNoteHud() {
     if (!this._canHUD?.(game.user, event)) return;
     const hud = canvas?.hud?.note;
     if (!hud) return;
-    if (hud.object === this) hud.clear();
-    else hud.bind(this);
+    if (hud.object === this) {
+      // V13: BasePlaceableHUD#clear is deprecated in favor of #close
+      (hud.close ?? hud.clear).call(hud);
+    } else {
+      hud.bind(this);
+    }
   };
 }
 

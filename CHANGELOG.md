@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.9] — 2026-05-01
+
+### Fixed
+
+- **Right-clicking the same note again now toggles the HUD off.** Previously the HUD overlay captured pointer events, so the second right-click hit the HUD instead of the note — and clicks that fell off the HUD reached the canvas, causing scene-pan. Wrapper is now `pointer-events: none`, only the button itself captures clicks. Right-clicks anywhere else fall through to the note (or canvas, as appropriate).
+- **HUD positioned above the note** instead of overlapping it. Visually clearer and reinforces the click-through behavior.
+- **Deprecation warning gone:** `BasePlaceableHUD#clear` → `#close` (V13 deprecation, removed in V15). Falls back to `clear` for older builds.
+
 ## [0.6.8] — 2026-05-01
 
 ### Removed
