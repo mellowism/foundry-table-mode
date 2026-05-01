@@ -15,18 +15,11 @@ function getEmbedUrl(page) {
 }
 
 /**
- * Normalize URL for embedding. Currently:
- *  - Rewrite Homebrewery `/share/{id}` → `/print/{id}` (chrome-less variant).
+ * Normalize URL for embedding. Reserved for future per-host transforms.
+ * v0.6.3 attempted Homebrewery /share/ → /print/ rewrite — reverted in 0.6.4
+ * because /print/{id} redirects to the homepage for shared (non-authored) brews.
  */
 function normalizeEmbedUrl(url) {
-  if (!url) return url;
-  try {
-    const u = new URL(url);
-    if (u.hostname === 'homebrewery.naturalcrit.com' && u.pathname.startsWith('/share/')) {
-      u.pathname = '/print/' + u.pathname.slice('/share/'.length);
-      return u.toString();
-    }
-  } catch (_) { /* not a parseable URL — return as-is */ }
   return url;
 }
 

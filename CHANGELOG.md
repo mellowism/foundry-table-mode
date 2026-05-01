@@ -2,6 +2,12 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.4] — 2026-05-01
+
+### Reverted
+
+- Homebrewery `/share/` → `/print/` URL rewrite from 0.6.3. The `/print/{id}` endpoint redirects unauthenticated visitors to the Homebrewery homepage for shared brews — it's only valid for the brew's authors. Paste `/share/` URLs again; Homebrewery toolbar chrome remains visible (cross-origin iframe limitation, no public chrome-less endpoint).
+
 ## [0.6.3] — 2026-05-01
 
 ### Added — Smarter URL handling for TV Embed
