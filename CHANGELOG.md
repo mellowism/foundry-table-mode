@@ -2,6 +2,13 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.6] — 2026-05-01
+
+### Changed
+
+- **Removed render-type dropdown.** Auto-detection by URL file extension covers Homebrewery share links and direct image URLs (`.png/.jpg/...`) reliably enough that the explicit override added in 0.6.5 was unnecessary clutter. If auto fails for some host in the future, we'll add it back.
+- **Default embed window size bumped** from 900×1100 to 920×1180 — gives Homebrewery PHB pages a bit more vertical breathing room. Window is resizable; Foundry persists position across sessions.
+
 ## [0.6.5] — 2026-05-01
 
 ### Added — Render-type override and Homebrewery toolbar clip
