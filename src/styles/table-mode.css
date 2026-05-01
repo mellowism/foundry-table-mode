@@ -71,6 +71,21 @@
   background: #fff;
   display: block;
 }
+/* Clip-top wrapper — pulls iframe up to hide host chrome (e.g. Homebrewery navbar) */
+.table-mode-embed-iframe-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.table-mode-embed-iframe-clipped {
+  position: absolute;
+  left: 0;
+  top: calc(0px - var(--tm-clip-top, 0px));
+  width: 100%;
+  height: calc(100% + var(--tm-clip-top, 0px));
+  border: 0;
+}
 .table-mode-embed-image-wrap {
   width: 100%;
   height: 100%;

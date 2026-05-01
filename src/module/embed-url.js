@@ -3,6 +3,7 @@ import { getVttUserId } from './settings.js';
 
 const FLAG_SCOPE = MODULE_ID;
 const FLAG_KEY = 'embedUrl';
+const FLAG_TYPE = 'embedType'; // 'auto' | 'iframe' | 'image'
 
 function emit(type, payload) {
   game.socket.emit(SOCKET_NAME, { type, payload, senderId: game.user.id });
@@ -12,6 +13,19 @@ function t(key) { return game.i18n.localize(key); }
 
 function getEmbedUrl(page) {
   return page?.getFlag?.(FLAG_SCOPE, FLAG_KEY) || page?.flags?.[FLAG_SCOPE]?.[FLAG_KEY] || '';
+}
+
+function getEmbedType(page) {
+  const v = page?.getFlag?.(FLAG_SCOPE, FLAG_TYPE) || page?.flags?.[FLAG_SCOPE]?.[FLAG_TYPE];
+  return (v === 'iframe' || v === 'image') ? v : 'auto';
+}
+
+function clipTopForHost(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'homebrewery.naturalcrit.com') return 90;
+  } catch (_) {}
+  return 0;
 }
 
 /**
@@ -63,8 +77,10 @@ export async function toggleEmbedOnVtt(page) {
     return;
   }
   const url = normalizeEmbedUrl(rawUrl);
+  const type = getEmbedType(page);
+  const clipTop = clipTopForHost(url);
   const title = page.name || page.parent?.name || 'Embed';
-  emit(MSG.EMBED_OPEN, { pageId: page.id, url, title, targetUserId });
+  emit(MSG.EMBED_OPEN, { pageId: page.id, url, title, type, clipTop, targetUserId });
   activeEmbed = { pageId: page.id, url, title };
   refreshSheets(page);
 }
@@ -105,17 +121,24 @@ export function onRenderJournalPageSheet(app, html) {
 
   const form = root.querySelector('form') ?? root;
   const current = getEmbedUrl(page);
+  const currentType = getEmbedType(page);
 
   const container = document.createElement('div');
   container.className = 'form-group table-mode-embed-url-section';
   container.setAttribute(`data-${MODULE_ID}-embed-url`, '1');
+  const typeOpt = (val, label) => `<option value="${val}"${val === currentType ? ' selected' : ''}>${label}</option>`;
   container.innerHTML = `
     <label style="display:flex;align-items:center;gap:6px;">
       <i class="fas fa-tv" style="color:#ffc107"></i>
       ${t('TABLE_MODE.EmbedUrl.FieldLabel')}
     </label>
-    <div class="form-fields">
+    <div class="form-fields" style="display:flex;gap:6px;">
       <input type="url" name="flags.${FLAG_SCOPE}.${FLAG_KEY}" value="${escapeAttr(current)}" placeholder="https://homebrewery.naturalcrit.com/share/..." style="flex:1"/>
+      <select name="flags.${FLAG_SCOPE}.${FLAG_TYPE}" style="flex:0 0 auto;width:110px;">
+        ${typeOpt('auto', t('TABLE_MODE.EmbedUrl.TypeAuto'))}
+        ${typeOpt('iframe', t('TABLE_MODE.EmbedUrl.TypeIframe'))}
+        ${typeOpt('image', t('TABLE_MODE.EmbedUrl.TypeImage'))}
+      </select>
     </div>
     <p class="hint">${t('TABLE_MODE.EmbedUrl.FieldHint')}</p>
   `;
@@ -155,17 +178,21 @@ function buildAppClass() {
     };
 
     constructor(options = {}) {
-      const { url, embedTitle, ...rest } = options;
+      const { url, embedTitle, type, clipTop, ...rest } = options;
       super(rest);
       this._url = url ?? '';
       this._title = embedTitle ?? t('TABLE_MODE.EmbedFrame.DefaultTitle');
+      this._type = type ?? 'auto';
+      this._clipTop = Number.isFinite(clipTop) ? clipTop : 0;
     }
 
     get title() { return this._title; }
 
-    setUrl(url, title) {
+    setUrl(url, title, type, clipTop) {
       this._url = url;
       if (title) this._title = title;
+      if (type) this._type = type;
+      if (Number.isFinite(clipTop)) this._clipTop = clipTop;
       if (this.rendered) this.render();
     }
 
@@ -180,8 +207,13 @@ function buildAppClass() {
     async _renderHTML(_context, _options) {
       const url = this._url || 'about:blank';
       const safe = String(url).replaceAll('"', '&quot;');
-      if (isImageUrl(url)) {
+      const renderImage = this._type === 'image' || (this._type === 'auto' && isImageUrl(url));
+      if (renderImage) {
         return `<div class="table-mode-embed-image-wrap"><img src="${safe}" alt=""/></div>`;
+      }
+      const clip = Math.max(0, this._clipTop | 0);
+      if (clip > 0) {
+        return `<div class="table-mode-embed-iframe-wrap" style="--tm-clip-top:${clip}px"><iframe class="table-mode-embed-iframe table-mode-embed-iframe-clipped" src="${safe}" allow="fullscreen"></iframe></div>`;
       }
       return `<iframe class="table-mode-embed-iframe" src="${safe}" allow="fullscreen"></iframe>`;
     }
@@ -204,14 +236,14 @@ function ensureAppClass() {
   return EmbedFrameAppClass;
 }
 
-function openOrUpdate(url, title) {
+function openOrUpdate(url, title, type, clipTop) {
   const Cls = ensureAppClass();
   if (activeApp?.rendered) {
-    activeApp.setUrl(url, title);
+    activeApp.setUrl(url, title, type, clipTop);
     activeApp.bringToTop?.();
     return;
   }
-  activeApp = new Cls({ url, embedTitle: title });
+  activeApp = new Cls({ url, embedTitle: title, type, clipTop });
   activeApp.render(true);
 }
 
@@ -230,7 +262,7 @@ export function handleEmbedOpen(msg) {
   const { payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
   if (senderId === game.user.id) return;
-  openOrUpdate(payload.url, payload.title);
+  openOrUpdate(payload.url, payload.title, payload.type, payload.clipTop);
 }
 
 export function handleEmbedClose(msg) {

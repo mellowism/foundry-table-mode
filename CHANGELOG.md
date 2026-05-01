@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.6.5] — 2026-05-01
+
+### Added — Render-type override and Homebrewery toolbar clip
+
+- **"Render as" select** next to the Embed URL field: `Auto` (default — uses extension/MIME detection), `Iframe` (force iframe), `Image` (force `<img>`-with-`object-fit:contain`). Use `Image` for URLs without a clear file extension (Google Images thumbnails, signed CDN links, etc.) where auto-detection misses.
+- **Homebrewery navbar auto-clipped (~90px)** when the embed URL hostname is `homebrewery.naturalcrit.com`. CSS-clip-trick on our iframe wrapper — we can't inject CSS into the cross-origin iframe content, but we own the iframe element and pull it up under an `overflow:hidden` container so the host's toolbar scrolls out of view.
+
+### Limitations
+
+- Homebrewery's "Notice" popup is a centered modal — can't clip it. User dismisses once via the X. Homebrewery may or may not remember dismissal across sessions (not under our control).
+- Clipping is per-host hard-coded for now. Other hosts get no clip. If a future host needs it, add to `clipTopForHost()` in `embed-url.js`.
+
 ## [0.6.4] — 2026-05-01
 
 ### Reverted
