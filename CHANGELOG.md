@@ -2,6 +2,37 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.9.0] — 2026-05-02
+
+### Changed — "Hidden tokens" is now VTT-only (vision-safe)
+
+The previous "Default new tokens to hidden" behavior used Foundry's native `hidden: true` flag. That flag is binary: hides the token *and* blocks vision-sharing to the token's owners — even at Observer level. Result: a VTT user (Observer on a player actor) saw a black screen because their assigned PC's vision was suppressed by `hidden: true`.
+
+This release replaces that mechanism with a **module-private flag** (`flags.foundry-table-mode.vttHidden`) that hides token sprites *only on the VTT client*. Token document is never marked hidden. Vision, fog and global illumination compute normally for the VTT user. GM and other players see all tokens as before.
+
+### Added — Per-token VTT-hide toggle in the Token HUD
+
+Right-click a token as GM → the standard Foundry Token HUD now includes a red/yellow eye button. Click it to toggle whether that specific token is visible on the VTT client. Same UX as the existing map-note HUD eye:
+
+- Red `.active` = hidden on VTT
+- Yellow on hover
+- Default state = visible
+
+### Added — "Toggle Visibility on VTT — All Tokens" toolbar button
+
+New button in the Table Mode scene-controls category (user-secret icon). One click hides all tokens on the current scene from the VTT client; click again to reveal all. Mirrors the existing "Toggle All Map Notes" pattern.
+
+### Renamed setting label
+
+"Default new tokens to hidden + GM nameplate" → **"Default new tokens hidden on VTT + actor-name nameplate"**. Setting key (`defaultHiddenTokens`) is unchanged so your current value carries over. New behavior on token creation:
+- Sets our flag (not Foundry's `hidden`)
+- Sets `displayName: OWNER` (GM nameplate, hidden from players) — unchanged
+- Sets `name: actor.name` — unchanged
+
+### Migration note
+
+Tokens that were previously created with `hidden: true` from the old setting are still natively hidden. Right-click each → toggle the standard hidden-eye OFF. Then optionally toggle the new VTT-hide eye ON to restore the table-TV invisibility without breaking vision.
+
 ## [0.8.2] — 2026-05-02
 
 ### Fixed — Scene Controls crash when other modules are active

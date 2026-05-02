@@ -32,10 +32,19 @@ import {
   onSettingChange as onHideGmCursorSettingChange,
   installCursorPatches
 } from './hide-gm-cursor.js';
-import { onPreCreateToken } from './default-hidden-tokens.js';
+import {
+  onPreCreateToken,
+  onDrawToken,
+  onRefreshToken,
+  onUpdateToken,
+  onRenderTokenHUD,
+  onCanvasReady as onVttTokenHideCanvasReady,
+  reapplyAll as reapplyVttTokenHide
+} from './vtt-token-hide.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
+const VTT_TOKEN_HIDE_SETTING_KEYS = new Set(['vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -93,6 +102,7 @@ Hooks.on('updateSetting', (setting) => {
   if (shortKey === 'vttAspect') applyAspectNow();
   if (UI_SETTING_KEYS.has(shortKey)) applyUiCleanup();
   if (GM_CURSOR_SETTING_KEYS.has(shortKey)) onHideGmCursorSettingChange();
+  if (VTT_TOKEN_HIDE_SETTING_KEYS.has(shortKey)) reapplyVttTokenHide();
 });
 
 
@@ -116,13 +126,18 @@ Hooks.on('renderJournalEntryPageSheet', onRenderEmbedPageSheet);
 Hooks.on('closeJournalSheet', onVttJournalClose);
 Hooks.on('closeJournalEntrySheet', onVttJournalClose);
 
-// Default new tokens to hidden when the setting is on
+// VTT Token Hide — default-on-create + per-token HUD button + sprite hiding on VTT
 Hooks.on('preCreateToken', onPreCreateToken);
+Hooks.on('renderTokenHUD', onRenderTokenHUD);
+Hooks.on('drawToken', onDrawToken);
+Hooks.on('refreshToken', onRefreshToken);
+Hooks.on('updateToken', onUpdateToken);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));
   onNoteHudCanvasReady();
   onHideGmCursorCanvasReady();
+  onVttTokenHideCanvasReady();
 });
 
 Hooks.on('canvasTearDown', () => {

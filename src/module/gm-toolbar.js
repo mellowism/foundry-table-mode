@@ -3,6 +3,7 @@ import { syncOnce } from './viewport-controller.js';
 import { toggleViewbox, isEnabled as isViewboxEnabled } from './viewbox-controller.js';
 import { reloadVtt } from './client-actions.js';
 import { toggleAllVisibility as toggleAllNotes } from './note-hud.js';
+import { toggleAllTokensOnVtt } from './vtt-token-hide.js';
 
 function t(key) { return game.i18n.localize(key); }
 
@@ -57,6 +58,13 @@ export function registerSceneControls() {
           icon: 'fas fa-eye',
           button: true,
           onChange: () => toggleAllNotes()
+        },
+        toggleTokens: {
+          name: 'toggleTokens',
+          title: t('TABLE_MODE.Controls.ToggleAllTokens'),
+          icon: 'fas fa-user-secret',
+          button: true,
+          onChange: () => toggleAllTokensOnVtt()
         }
       }
     };

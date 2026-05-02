@@ -48,6 +48,19 @@
   border-color: #ff4444;
 }
 
+/* VTT-Hide eye in the Token HUD (right-click a token as GM).
+   Red when active (hidden on VTT), yellow on hover — mirrors map-note HUD. */
+#token-hud .control-icon.table-mode-vtt-hide:hover,
+.token-hud .control-icon.table-mode-vtt-hide:hover {
+  color: #ffc107;
+  border-color: #ffc107;
+}
+#token-hud .control-icon.table-mode-vtt-hide.active,
+.token-hud .control-icon.table-mode-vtt-hide.active {
+  color: #ff4444;
+  border-color: #ff4444;
+}
+
 /* Embed URL section in journal page edit form */
 .table-mode-embed-url-section {
   border: 1px solid rgba(255, 193, 7, 0.4);
