@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.8.0] — 2026-05-02
+
+### Changed — Default-hidden tokens also get GM nameplate
+
+The "Default new tokens to hidden" setting now also sets `displayName: OWNER (40)` on the placed token. The GM (technical owner of all tokens) sees a nameplate on every placed token — useful as a position label during combat with physical minis. Players see nameplates only on tokens they own (their PC).
+
+Setting label updated to reflect the dual behavior: "Default new tokens to hidden + GM nameplate".
+
 ## [0.7.4] — 2026-05-02
 
 ### Added — Default new tokens to hidden
