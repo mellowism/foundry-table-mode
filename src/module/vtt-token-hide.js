@@ -20,7 +20,21 @@ function isVttHidden(tokenDoc) {
 }
 
 function isThisClientTheVtt() {
-  return game.user.id === getVttUserId();
+  // Settings register at `ready`, but canvasReady can fire earlier. Reading
+  // an unregistered setting throws — return false in that early window.
+  try {
+    return game.user.id === getVttUserId();
+  } catch (_) {
+    return false;
+  }
+}
+
+function isDefaultHiddenSafe() {
+  try {
+    return isDefaultHiddenTokensEnabled();
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -111,7 +125,7 @@ export function onRenderTokenHUD(hud, htmlOrJq) {
 
 export function onPreCreateToken(token) {
   if (!game.user?.isGM) return;
-  if (!isDefaultHiddenTokensEnabled()) return;
+  if (!isDefaultHiddenSafe()) return;
   const ownerDisplay = CONST?.TOKEN_DISPLAY_MODES?.OWNER ?? 40;
   const updates = {
     displayName: ownerDisplay,

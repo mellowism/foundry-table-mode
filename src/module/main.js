@@ -93,6 +93,11 @@ Hooks.once('ready', () => {
   }
 
   applyUiCleanup();
+
+  // Re-sweep token visibility now that settings are registered. canvasReady
+  // can fire before this hook, in which case the early reapplyAll() bailed
+  // out (settings reads throw before ready). Catch up here.
+  reapplyVttTokenHide();
 });
 
 Hooks.on('updateSetting', (setting) => {

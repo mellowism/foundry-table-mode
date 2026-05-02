@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.9.1] — 2026-05-02
+
+### Fixed — Settings-not-registered crash on canvasReady
+
+The 0.9.0 `vtt-token-hide` module read settings (`vttUserId`, `defaultHiddenTokens`) from inside `reapplyAll()` and `onPreCreateToken`. But Foundry's `canvasReady` hook can fire **before** the `ready` hook (where we register settings). Result: every world login crashed with `"foundry-table-mode.vttUserId" is not a registered game setting` and the `canvasReady` hook chain aborted.
+
+Same root cause and fix as 0.7.3 (cursor patches): wrap settings reads in try/catch, return safe defaults during the early-lifecycle window. Once `ready` fires, settings work normally.
+
+Also added a `reapplyAll()` call at the end of the `ready` hook to catch up on tokens that were drawn during the early `canvasReady` window (when our reapply was a no-op).
+
 ## [0.9.0] — 2026-05-02
 
 ### Changed — "Hidden tokens" is now VTT-only (vision-safe)
