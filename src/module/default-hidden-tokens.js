@@ -19,9 +19,16 @@ export function onPreCreateToken(token) {
   if (!game.user?.isGM) return;
   if (!isDefaultHiddenTokensEnabled()) return;
   const ownerDisplay = CONST?.TOKEN_DISPLAY_MODES?.OWNER ?? 40;
-  // updateSource mutates the in-memory document data before it's saved.
-  token.updateSource({
+  const updates = {
     hidden: true,
     displayName: ownerDisplay
-  });
+  };
+  // Use the actor's name instead of whatever the prototype-token's name was
+  // (dnd5e and similar systems often default the prototype name to a generic
+  // string like "Player Character" — we want the token to reflect the actor
+  // the user actually dragged onto the scene).
+  const actorName = token.actor?.name;
+  if (actorName) updates.name = actorName;
+  // updateSource mutates the in-memory document data before it's saved.
+  token.updateSource(updates);
 }

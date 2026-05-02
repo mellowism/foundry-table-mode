@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.8.1] — 2026-05-02
+
+### Changed — Default-hidden tokens also use actor name
+
+The "Default new tokens to hidden" setting now also sets `token.name` to the linked Actor's name (instead of the prototype-token's default, which is often a generic like "Player Character" from the system template). When you drag an actor onto a scene, the placed token's nameplate matches the actor as you'd expect.
+
+Hook now writes three fields on `preCreateToken`: `hidden: true`, `displayName: OWNER (40)`, `name: actor.name`.
+
 ## [0.8.0] — 2026-05-02
 
 ### Changed — Default-hidden tokens also get GM nameplate
