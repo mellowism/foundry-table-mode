@@ -1,5 +1,6 @@
 {
   "TABLE_MODE.Controls.Title": "Table Mode",
+  "TABLE_MODE.Controls.Select": "Select (no-op default)",
   "TABLE_MODE.Controls.ToggleViewbox": "Toggle Viewbox (drag to move, bottom-right handle to resize)",
   "TABLE_MODE.Controls.SyncOnce": "Sync Viewport to VTT",
   "TABLE_MODE.Controls.ReloadVtt": "Force Reload VTT Client",

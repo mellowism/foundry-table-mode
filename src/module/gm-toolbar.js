@@ -16,7 +16,17 @@ export function registerSceneControls() {
       icon: 'fas fa-tv',
       layer: 'controls',
       visible: true,
+      activeTool: 'select',
       tools: {
+        // No-op selector — gives Foundry's SceneControls a valid default tool
+        // to fall back on when other code paths (e.g. dropping an actor on
+        // canvas, other modules re-rendering controls) trigger a tool-change
+        // lookup. Without this the lookup hits `tools[undefined]` and crashes.
+        select: {
+          name: 'select',
+          title: t('TABLE_MODE.Controls.Select'),
+          icon: 'fas fa-mouse-pointer'
+        },
         viewbox: {
           name: 'viewbox',
           title: t('TABLE_MODE.Controls.ToggleViewbox'),

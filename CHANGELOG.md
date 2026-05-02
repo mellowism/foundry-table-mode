@@ -2,6 +2,22 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.8.2] — 2026-05-02
+
+### Fixed — Scene Controls crash when other modules are active
+
+Our `Table Mode` scene-control category had no `activeTool` defined. In a single-module dev environment this never mattered, but in production with other modules enabled (Carousel Combat Tracker, etc.), Foundry's SceneControls re-evaluation runs through code paths we didn't hit before — including the actor-drop path:
+
+```
+TokenLayer5e._onDropActorData → TokenLayer5e.activate
+  → SceneControls.activate → #preActivate → #onToolChange → #onChange
+  Cannot read properties of undefined (reading 'onChange')
+```
+
+Foundry resolves `controls[active].tools[activeTool]`, finds `undefined`, then crashes on `.onChange` (and on click, on `.button`). Symptom: viewbox toggle stuck on (every click crashed before reaching `disableViewbox()`), and console flooded with the two error variants on actor drag/drop.
+
+Added a no-op `select` selector tool (matching core's pattern in the tokens category) and set `activeTool: 'select'`. Clicking the Table Mode category icon now activates the selector, not any of the action tools — the v0.1.3 lesson about button-tools-as-activeTool firing handlers on category click stays respected.
+
 ## [0.8.1] — 2026-05-02
 
 ### Changed — Default-hidden tokens also use actor name
