@@ -32,6 +32,7 @@ import {
   onSettingChange as onHideGmCursorSettingChange,
   installCursorPatches
 } from './hide-gm-cursor.js';
+import { onPreCreateToken } from './default-hidden-tokens.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
@@ -114,6 +115,9 @@ Hooks.on('renderJournalEntryPageSheet', onRenderEmbedPageSheet);
 // VTT-side: detect user-initiated close so we can notify GM
 Hooks.on('closeJournalSheet', onVttJournalClose);
 Hooks.on('closeJournalEntrySheet', onVttJournalClose);
+
+// Default new tokens to hidden when the setting is on
+Hooks.on('preCreateToken', onPreCreateToken);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));

@@ -13,6 +13,8 @@
   "TABLE_MODE.Settings.HideUi.Hint": "Hides all UI chrome on the VTT client — sidebar, chat, scene navigation, player list, hotbar, scene controls, logo, pause indicator. Applies to the VTT client only. GM UI is not affected.",
   "TABLE_MODE.Settings.HideGmCursor.Name": "Hide GM cursor on VTT",
   "TABLE_MODE.Settings.HideGmCursor.Hint": "Suppresses the GM's cursor and ruler on the VTT client. Players don't see the GM's mouse moving across the table TV. Pings remain visible (so the GM can still draw attention to specific spots). Applies to the VTT client only.",
+  "TABLE_MODE.Settings.DefaultHiddenTokens.Name": "Default new tokens to hidden",
+  "TABLE_MODE.Settings.DefaultHiddenTokens.Hint": "When enabled, every newly-placed token starts hidden from players. Useful for the physical-minis workflow — players use real miniatures on the table TV, the digital token stays hidden until you reveal it via the standard right-click → eye toggle. Applies on token creation only; existing tokens are unaffected.",
   "TABLE_MODE.Notifications.NoVttUser": "Table Mode: no VTT user selected. Set one in module settings first.",
   "TABLE_MODE.Notifications.Synced": "Table Mode: viewport synced to VTT.",
   "TABLE_MODE.Notifications.ReloadSent": "Table Mode: reload command sent to VTT client.",

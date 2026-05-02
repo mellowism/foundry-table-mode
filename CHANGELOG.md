@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.7.4] — 2026-05-02
+
+### Added — Default new tokens to hidden
+
+New module setting **"Default new tokens to hidden"** (default: off, opt-in). When enabled, every token placed on a scene starts with `hidden: true` — invisible to players. Suits the physical-minis workflow: GM drags tokens to track positions, players see only the map on the TV and place real miniatures. Reveal individual tokens via the standard right-click → eye toggle when needed.
+
+Implemented via `preCreateToken` hook + `document.updateSource({ hidden: true })`. Covers drag/drop from sidebar, compendium drops, macro spawns, and MCP-driven creates.
+
 ## [0.7.3] — 2026-05-01
 
 ### Fixed — Settings-not-registered error cascade

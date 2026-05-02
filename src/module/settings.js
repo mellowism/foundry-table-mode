@@ -5,7 +5,8 @@ export const SETTINGS = {
   ANIMATION_DURATION: 'animationDuration',
   VTT_ASPECT: 'vttAspect',
   HIDE_UI: 'hideUi',
-  HIDE_GM_CURSOR: 'hideGmCursor'
+  HIDE_GM_CURSOR: 'hideGmCursor',
+  DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens'
 };
 
 const ASPECT_PRESETS = {
@@ -67,6 +68,13 @@ export function registerSettings() {
     scope: 'world', config: true, type: Boolean,
     default: true, requiresReload: false
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.DEFAULT_HIDDEN_TOKENS, {
+    name: game.i18n.localize('TABLE_MODE.Settings.DefaultHiddenTokens.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.DefaultHiddenTokens.Hint'),
+    scope: 'world', config: true, type: Boolean,
+    default: false, requiresReload: false
+  });
 }
 
 export function getVttUserId() {
@@ -84,4 +92,7 @@ export function isHideUiEnabled() {
 }
 export function isHideGmCursorEnabled() {
   return game.settings.get(MODULE_ID, SETTINGS.HIDE_GM_CURSOR);
+}
+export function isDefaultHiddenTokensEnabled() {
+  return game.settings.get(MODULE_ID, SETTINGS.DEFAULT_HIDDEN_TOKENS);
 }
