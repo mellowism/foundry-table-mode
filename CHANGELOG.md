@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.9.2] — 2026-05-02
+
+### Fixed — V13 deprecation spam on token draw/refresh
+
+`Token#target` was split into `targetArrows` + `targetPips` in V13. The legacy `target` getter still works but logs a "Deprecated since Version 13 — removed in V14" warning every time it is read. We were reading it on every `drawToken` and `refreshToken` to set its `visible` flag. Replaced with the two new graphic names — no more deprecation spam, behavior identical.
+
+### Fixed — Eye icon in Token HUD now actually red when active
+
+CSS specificity collision: Foundry's default `.control-icon.active` rule beat our scoped rule, so the icon stayed in Foundry's white/highlighted style instead of our red/yellow palette. Used `!important` on our color/border-color rules and dropped the `#token-hud`/`.token-hud` parent selector — the `.table-mode-vtt-hide` class is already specific enough. Now matches map-note HUD exactly: red when hidden, yellow on hover.
+
 ## [0.9.1] — 2026-05-02
 
 ### Fixed — Settings-not-registered crash on canvasReady

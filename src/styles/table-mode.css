@@ -49,16 +49,20 @@
 }
 
 /* VTT-Hide eye in the Token HUD (right-click a token as GM).
-   Red when active (hidden on VTT), yellow on hover — mirrors map-note HUD. */
-#token-hud .control-icon.table-mode-vtt-hide:hover,
-.token-hud .control-icon.table-mode-vtt-hide:hover {
-  color: #ffc107;
-  border-color: #ffc107;
+   Red when active (hidden on VTT), yellow on hover — mirrors map-note HUD.
+   !important needed because Foundry's default .control-icon.active styling
+   has equal/higher specificity and would otherwise win. */
+.control-icon.table-mode-vtt-hide:hover {
+  color: #ffc107 !important;
+  border-color: #ffc107 !important;
 }
-#token-hud .control-icon.table-mode-vtt-hide.active,
-.token-hud .control-icon.table-mode-vtt-hide.active {
-  color: #ff4444;
-  border-color: #ff4444;
+.control-icon.table-mode-vtt-hide.active {
+  color: #ff4444 !important;
+  border-color: #ff4444 !important;
+}
+.control-icon.table-mode-vtt-hide.active:hover {
+  color: #ffc107 !important;
+  border-color: #ffc107 !important;
 }
 
 /* Embed URL section in journal page edit form */

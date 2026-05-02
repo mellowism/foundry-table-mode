@@ -13,7 +13,10 @@ import { getVttUserId, isDefaultHiddenTokensEnabled } from './settings.js';
  */
 
 const FLAG_KEY = 'vttHidden';
-const VISIBLE_PARTS = ['mesh', 'bars', 'nameplate', 'effects', 'tooltip', 'border', 'target'];
+// V13 split Token#target into targetArrows + targetPips. The legacy `target`
+// getter returns targetArrows but logs a deprecation warning every refresh —
+// list the new names directly.
+const VISIBLE_PARTS = ['mesh', 'bars', 'nameplate', 'effects', 'tooltip', 'border', 'targetArrows', 'targetPips'];
 
 function isVttHidden(tokenDoc) {
   return !!tokenDoc?.getFlag?.(MODULE_ID, FLAG_KEY);
