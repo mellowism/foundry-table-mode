@@ -43,7 +43,8 @@ const state = {
   pointerDown: false,
   lastMoveTs: 0,
   handlers: null,
-  sightActivated: false
+  sizeDialog: null,
+  closingDialog: false
 };
 
 /* ------------------------------------------------------------------ */
@@ -138,26 +139,29 @@ async function ensureBrushActor() {
 export async function toggleBrush() {
   if (!game.user.isGM) return;
   if (state.active) return exitPaintMode();
-  return enterPaintMode();
+  await enterPaintMode();
+  // Auto-open the size dialog as a non-modal floating menu. User can adjust
+  // size while painting; closing the dialog exits paint mode.
+  if (state.active) openBrushSizeMenu();
 }
 
 /**
- * Open a tiny popup with a brush-size slider (Simple Fog-style UX).
- * Live-updates the brush sight + cursor circle as the slider moves.
+ * Open a non-modal floating popup with a brush-size slider.
+ * Stays open during paint mode; closing the dialog exits paint mode.
  */
 export async function openBrushSizeMenu() {
   if (!game.user.isGM) return;
+  // Don't double-open
+  if (state.sizeDialog) return;
+
   const current = getBrushSize();
   const DialogV2 = foundry.applications?.api?.DialogV2;
   if (!DialogV2) {
-    // Fallback: cycle through a few presets
+    // Fallback: cycle through presets
     const presets = [1, 3, 6, 12];
     const idx = presets.indexOf(current);
     const next = presets[(idx + 1) % presets.length];
     await setBrushSize(next);
-    ui.notifications.info(
-      game.i18n.format('TABLE_MODE.Notifications.BrushSizeChanged', { size: next })
-    );
     return;
   }
 
@@ -165,7 +169,7 @@ export async function openBrushSizeMenu() {
     <div class="table-mode-brush-size-menu">
       <label style="display:block; margin-bottom:6px;">
         <strong>${game.i18n.localize('TABLE_MODE.FogBrush.SizeLabel')}</strong>:
-        <span class="table-mode-brush-size-value" data-bind="value">${current}</span>
+        <span class="table-mode-brush-size-value">${current}</span>
         <span style="opacity:0.7;">${game.i18n.localize('TABLE_MODE.FogBrush.SizeUnit')}</span>
       </label>
       <input type="range" min="${MIN_BRUSH_SIZE}" max="${MAX_BRUSH_SIZE}" step="1"
@@ -177,18 +181,29 @@ export async function openBrushSizeMenu() {
   const dialog = new DialogV2({
     window: {
       title: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuTitle'),
-      icon: 'fas fa-circle-dot'
+      icon: 'fas fa-paintbrush'
     },
     position: { width: 280 },
     content: html,
-    buttons: [{
-      action: 'close',
-      label: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuClose') ?? 'Close',
-      default: true,
-      callback: () => true
-    }],
+    buttons: [],
+    modal: false,
     rejectClose: false
   });
+
+  state.sizeDialog = dialog;
+
+  // Hook the close lifecycle to exit paint mode when dialog is closed
+  const origClose = dialog.close.bind(dialog);
+  dialog.close = async (...args) => {
+    const wasClosingFromExit = state.closingDialog;
+    state.sizeDialog = null;
+    const result = await origClose(...args);
+    if (!wasClosingFromExit && state.active) {
+      // User closed the dialog manually → exit paint mode too
+      await exitPaintMode();
+    }
+    return result;
+  };
 
   dialog.render({ force: true }).then(() => {
     const root = dialog.element;
@@ -323,7 +338,6 @@ async function enterPaintMode() {
   state.active = true;
   state.pointerDown = false;
   state.lastMoveTs = 0;
-  state.sightActivated = false;
 
   installCursorOverlay(sizeSquares);
   installCanvasListeners();
@@ -339,6 +353,15 @@ async function exitPaintMode() {
   removeCursorOverlay();
   document.body.classList.remove('table-mode-fog-paint-active');
 
+  // Close size dialog if still open. Flag prevents the close-handler from
+  // recursing into exitPaintMode().
+  if (state.sizeDialog) {
+    state.closingDialog = true;
+    try { await state.sizeDialog.close(); } catch (_) {}
+    state.closingDialog = false;
+    state.sizeDialog = null;
+  }
+
   const scene = canvas?.scene;
   if (scene && state.brushTokenId) {
     try {
@@ -351,7 +374,6 @@ async function exitPaintMode() {
   state.brushTokenId = null;
   state.active = false;
   state.pointerDown = false;
-  state.sightActivated = false;
 
   ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.PaintModeExited'));
 }
@@ -467,8 +489,20 @@ function onMouseDown(ev) {
   paintAt(local.x, local.y, true);
 }
 
-function onMouseUp(_ev) {
+async function onMouseUp(_ev) {
+  if (!state.pointerDown) return;
   state.pointerDown = false;
+  // Park the brush (disable sight) so the area around the last-painted spot
+  // doesn't show as "currently lit" on the VTT — it falls back to "explored
+  // but out of sight" matching the rest of the painted fog.
+  if (!state.brushTokenId) return;
+  const tokenDoc = canvas?.scene?.tokens.get(state.brushTokenId);
+  if (!tokenDoc) return;
+  try {
+    await tokenDoc.update({ 'sight.enabled': false }, { animate: false });
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Park brush failed`, e);
+  }
 }
 
 function onMouseLeave(_ev) {
@@ -491,9 +525,9 @@ async function paintAt(x, y, force = false) {
     x: Math.round(x - half),
     y: Math.round(y - half)
   };
-  if (!state.sightActivated) {
+  // Each new stroke re-enables sight (mouseup disables it to "park" the brush)
+  if (!tokenDoc.sight?.enabled) {
     update['sight.enabled'] = true;
-    state.sightActivated = true;
   }
   try {
     await tokenDoc.update(update, { animate: false });
@@ -511,8 +545,13 @@ export function onCanvasTeardown() {
   removeCanvasListeners();
   removeCursorOverlay();
   document.body.classList.remove('table-mode-fog-paint-active');
+  if (state.sizeDialog) {
+    state.closingDialog = true;
+    try { state.sizeDialog.close(); } catch (_) {}
+    state.closingDialog = false;
+    state.sizeDialog = null;
+  }
   state.active = false;
   state.pointerDown = false;
   state.brushTokenId = null;
-  state.sightActivated = false;
 }
