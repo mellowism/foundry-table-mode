@@ -2,7 +2,7 @@
   "id": "foundry-table-mode",
   "title": "Foundry Table Mode",
   "description": "Orchestration layer for in-person table-TV D&D setups. One GM toolbar controls viewport lock, display push, and mood presets on a dedicated VTT-user client.",
-  "version": "0.12.0-rc.6",
+  "version": "0.12.0-rc.7",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
@@ -19,7 +19,7 @@
   "readme": "https://github.com/mellowism/foundry-table-mode/blob/main/README.md",
   "license": "https://github.com/mellowism/foundry-table-mode/blob/main/LICENSE",
   "esmodules": [
-    "dist/table-mode-v0.12.0-rc.6.js"
+    "dist/table-mode-v0.12.0-rc.7.js"
   ],
   "styles": [
     "src/styles/table-mode.css"

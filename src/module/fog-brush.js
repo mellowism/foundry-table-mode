@@ -289,9 +289,15 @@ export async function resetFog() {
   if (!confirmed) return;
 
   try {
-    // V13: canvas.fog.reset() — direct API (scene.fog.reset field-update path
-    // doesn't trigger fog re-init for current canvas)
+    // Three-step reset: clear local fog data, broadcast to other clients via
+    // scene field update, then trigger a perception refresh so the canvas
+    // actually redraws. Any one of these alone misses something.
     await canvas.fog.reset();
+    await canvas.scene.update({ 'fog.reset': Date.now() });
+    canvas.perception?.update?.(
+      { refreshVision: true, refreshLighting: true, refreshOcclusion: true },
+      true
+    );
     ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.FogReset'));
   } catch (e) {
     console.error(`[${MODULE_ID}] Reset fog failed`, e);
