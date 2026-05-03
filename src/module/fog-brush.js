@@ -29,8 +29,11 @@ const BRUSH_SIZE_SETTING = 'fogBrushSize';
 const BRUSH_ACTOR_ID_SETTING = 'fogBrushActorId';
 
 const ACTOR_NAME = '_FogBrush';
-const BRUSH_SIZES = [10, 30, 60, 120];
-const DEFAULT_BRUSH_SIZE = 30;
+// Brush size is now in GRID SQUARES (not feet) — works across any scene
+// regardless of grid.distance/units. 1 square = grid.size pixels.
+const MIN_BRUSH_SIZE = 1;
+const MAX_BRUSH_SIZE = 20;
+const DEFAULT_BRUSH_SIZE = 3;
 const PAINT_THROTTLE_MS = 40;
 
 const state = {
@@ -138,33 +141,90 @@ export async function toggleBrush() {
   return enterPaintMode();
 }
 
-export async function cycleBrushSize() {
+/**
+ * Open a tiny popup with a brush-size slider (Simple Fog-style UX).
+ * Live-updates the brush sight + cursor circle as the slider moves.
+ */
+export async function openBrushSizeMenu() {
   if (!game.user.isGM) return;
   const current = getBrushSize();
-  const idx = BRUSH_SIZES.indexOf(current);
-  const next = BRUSH_SIZES[(idx + 1) % BRUSH_SIZES.length];
-  try {
-    await game.settings.set(MODULE_ID, BRUSH_SIZE_SETTING, next);
-  } catch (e) {
-    console.error(`[${MODULE_ID}] Cycle brush size failed`, e);
+  const DialogV2 = foundry.applications?.api?.DialogV2;
+  if (!DialogV2) {
+    // Fallback: cycle through a few presets
+    const presets = [1, 3, 6, 12];
+    const idx = presets.indexOf(current);
+    const next = presets[(idx + 1) % presets.length];
+    await setBrushSize(next);
+    ui.notifications.info(
+      game.i18n.format('TABLE_MODE.Notifications.BrushSizeChanged', { size: next })
+    );
     return;
   }
 
+  const html = `
+    <div class="table-mode-brush-size-menu">
+      <label style="display:block; margin-bottom:6px;">
+        <strong>${game.i18n.localize('TABLE_MODE.FogBrush.SizeLabel')}</strong>:
+        <span class="table-mode-brush-size-value" data-bind="value">${current}</span>
+        <span style="opacity:0.7;">${game.i18n.localize('TABLE_MODE.FogBrush.SizeUnit')}</span>
+      </label>
+      <input type="range" min="${MIN_BRUSH_SIZE}" max="${MAX_BRUSH_SIZE}" step="1"
+             value="${current}" class="table-mode-brush-size-slider"
+             style="width:100%;" />
+    </div>
+  `;
+
+  const dialog = new DialogV2({
+    window: {
+      title: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuTitle'),
+      icon: 'fas fa-circle-dot'
+    },
+    position: { width: 280 },
+    content: html,
+    buttons: [{
+      action: 'close',
+      label: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuClose') ?? 'Close',
+      default: true,
+      callback: () => true
+    }],
+    rejectClose: false
+  });
+
+  dialog.render({ force: true }).then(() => {
+    const root = dialog.element;
+    if (!root) return;
+    const slider = root.querySelector('.table-mode-brush-size-slider');
+    const label = root.querySelector('.table-mode-brush-size-value');
+    if (!slider) return;
+    slider.addEventListener('input', async (ev) => {
+      const v = Number(ev.target.value);
+      if (label) label.textContent = String(v);
+      await setBrushSize(v);
+    });
+  });
+}
+
+async function setBrushSize(size) {
+  const clamped = Math.max(MIN_BRUSH_SIZE, Math.min(MAX_BRUSH_SIZE, Math.round(size)));
+  try {
+    await game.settings.set(MODULE_ID, BRUSH_SIZE_SETTING, clamped);
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Set brush size failed`, e);
+    return;
+  }
+  // Live update of running paint mode
   const tokenDoc = state.brushTokenId ? canvas?.scene?.tokens.get(state.brushTokenId) : null;
   if (tokenDoc) {
+    const sceneRange = squaresToSceneUnits(clamped);
     try {
-      await tokenDoc.update({ 'sight.range': next });
+      await tokenDoc.update({ 'sight.range': sceneRange });
     } catch (e) {
       console.error(`[${MODULE_ID}] Update brush sight range failed`, e);
     }
   }
   if (state.cursorGfx) {
-    drawBrushCircle(state.cursorGfx, ftToPixels(next));
+    drawBrushCircle(state.cursorGfx, squaresToPixels(clamped));
   }
-
-  ui.notifications.info(
-    game.i18n.format('TABLE_MODE.Notifications.BrushSizeChanged', { size: next })
-  );
 }
 
 export async function resetFog() {
@@ -221,7 +281,8 @@ async function enterPaintMode() {
     return;
   }
 
-  const size = getBrushSize();
+  const sizeSquares = getBrushSize();
+  const sightRange = squaresToSceneUnits(sizeSquares);
   const dims = scene.dimensions ?? canvas.dimensions ?? {};
   const spawnX = (dims.sceneX ?? 0) + ((dims.sceneWidth ?? dims.width ?? 4000) / 2);
   const spawnY = (dims.sceneY ?? 0) + ((dims.sceneHeight ?? dims.height ?? 3000) / 2);
@@ -237,7 +298,7 @@ async function enterPaintMode() {
     sight: {
       ...(proto.sight ?? {}),
       enabled: false,
-      range: size,
+      range: sightRange,
       visionMode: 'basic'
     },
     flags: foundry.utils.mergeObject(
@@ -264,12 +325,12 @@ async function enterPaintMode() {
   state.lastMoveTs = 0;
   state.sightActivated = false;
 
-  installCursorOverlay(size);
+  installCursorOverlay(sizeSquares);
   installCanvasListeners();
   document.body.classList.add('table-mode-fog-paint-active');
 
   ui.notifications.info(
-    game.i18n.format('TABLE_MODE.Notifications.PaintModeEntered', { size })
+    game.i18n.format('TABLE_MODE.Notifications.PaintModeEntered', { size: sizeSquares })
   );
 }
 
@@ -299,12 +360,18 @@ async function exitPaintMode() {
 /* Cursor overlay (PIXI graphics following the mouse)                  */
 /* ------------------------------------------------------------------ */
 
-function ftToPixels(ft) {
+/** Convert brush size (in grid squares) to canvas pixels. */
+function squaresToPixels(squares) {
   const scene = canvas?.scene;
-  if (!scene) return 100;
-  const distance = scene.grid?.distance ?? 5;
-  const size = scene.grid?.size ?? 100;
-  return (ft / distance) * size;
+  const gridSize = scene?.grid?.size ?? 100;
+  return squares * gridSize;
+}
+
+/** Convert brush size (in grid squares) to scene units (for sight.range). */
+function squaresToSceneUnits(squares) {
+  const scene = canvas?.scene;
+  const distance = scene?.grid?.distance ?? 1;
+  return squares * distance;
 }
 
 function drawBrushCircle(gfx, radius) {
@@ -315,10 +382,10 @@ function drawBrushCircle(gfx, radius) {
   gfx.endFill();
 }
 
-function installCursorOverlay(sizeFt) {
+function installCursorOverlay(sizeSquares) {
   const gfx = new PIXI.Graphics();
   gfx.eventMode = 'none';
-  drawBrushCircle(gfx, ftToPixels(sizeFt));
+  drawBrushCircle(gfx, squaresToPixels(sizeSquares));
   gfx.visible = false;
   canvas.stage.addChild(gfx);
   state.cursorGfx = gfx;

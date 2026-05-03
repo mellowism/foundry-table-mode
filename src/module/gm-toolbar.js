@@ -4,7 +4,7 @@ import { toggleViewbox, isEnabled as isViewboxEnabled } from './viewbox-controll
 import { reloadVtt } from './client-actions.js';
 import { toggleAllVisibility as toggleAllNotes } from './note-hud.js';
 import { toggleAllTokensOnVtt } from './vtt-token-hide.js';
-import { toggleBrush, cycleBrushSize, resetFog, getBrushSize, isBrushSpawned } from './fog-brush.js';
+import { toggleBrush, openBrushSizeMenu, resetFog, getBrushSize, isBrushSpawned } from './fog-brush.js';
 
 function t(key) { return game.i18n.localize(key); }
 
@@ -77,10 +77,10 @@ export function registerSceneControls() {
         },
         fogBrushSize: {
           name: 'fogBrushSize',
-          title: t('TABLE_MODE.Controls.FogBrushSize') + ` (${getBrushSize()} ft)`,
+          title: t('TABLE_MODE.Controls.FogBrushSize') + ` (${getBrushSize()} sq)`,
           icon: 'fas fa-circle-dot',
           button: true,
-          onChange: () => cycleBrushSize()
+          onChange: () => openBrushSizeMenu()
         },
         fogReset: {
           name: 'fogReset',
