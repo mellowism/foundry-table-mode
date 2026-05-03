@@ -29,6 +29,8 @@
   "TABLE_MODE.FogBrush.SizeLabel": "Size",
   "TABLE_MODE.FogBrush.SizeUnit": "squares",
   "TABLE_MODE.FogBrush.SizeMenuClose": "Done",
+  "TABLE_MODE.FogBrush.ConstantRevealLabel": "Constant reveal",
+  "TABLE_MODE.FogBrush.ConstantRevealHint": "When on, painted areas stay 'currently lit' instead of fading to 'explored grey' between strokes.",
   "TABLE_MODE.Controls.FogReset": "Reset All Fog on Scene",
   "TABLE_MODE.FogBrush.ResetTitle": "Reset Fog of War?",
   "TABLE_MODE.FogBrush.ResetConfirm": "This will clear all explored fog on the current scene. Players will need to re-explore. Continue?",

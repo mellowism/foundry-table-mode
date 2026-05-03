@@ -27,6 +27,7 @@ const FOG_BRUSH_FLAG = 'fogBrush';
 const VTT_HIDDEN_FLAG = 'vttHidden';
 const BRUSH_SIZE_SETTING = 'fogBrushSize';
 const BRUSH_ACTOR_ID_SETTING = 'fogBrushActorId';
+const CONSTANT_REVEAL_SETTING = 'fogBrushConstantReveal';
 
 const ACTOR_NAME = '_FogBrush';
 // Brush size is now in GRID SQUARES (not feet) — works across any scene
@@ -44,7 +45,8 @@ const state = {
   lastMoveTs: 0,
   handlers: null,
   sizeDialog: null,
-  closingDialog: false
+  closingDialog: false,
+  savedLongPress: null
 };
 
 /* ------------------------------------------------------------------ */
@@ -64,6 +66,20 @@ export function registerBrushSettings() {
     type: String,
     default: ''
   });
+  game.settings.register(MODULE_ID, CONSTANT_REVEAL_SETTING, {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false
+  });
+}
+
+function getConstantReveal() {
+  try {
+    return game.settings.get(MODULE_ID, CONSTANT_REVEAL_SETTING) ?? false;
+  } catch (_) {
+    return false;
+  }
 }
 
 export function getBrushSize() {
@@ -165,6 +181,7 @@ export async function openBrushSizeMenu() {
     return;
   }
 
+  const constant = getConstantReveal();
   const html = `
     <div class="table-mode-brush-size-menu">
       <label style="display:block; margin-bottom:6px;">
@@ -175,6 +192,13 @@ export async function openBrushSizeMenu() {
       <input type="range" min="${MIN_BRUSH_SIZE}" max="${MAX_BRUSH_SIZE}" step="1"
              value="${current}" class="table-mode-brush-size-slider"
              style="width:100%;" />
+      <label style="display:flex; align-items:center; gap:6px; margin-top:10px; cursor:pointer;">
+        <input type="checkbox" class="table-mode-brush-constant-reveal" ${constant ? 'checked' : ''} />
+        <span>${game.i18n.localize('TABLE_MODE.FogBrush.ConstantRevealLabel')}</span>
+      </label>
+      <p style="font-size:11px; opacity:0.7; margin-top:4px;">
+        ${game.i18n.localize('TABLE_MODE.FogBrush.ConstantRevealHint')}
+      </p>
     </div>
   `;
 
@@ -183,7 +207,7 @@ export async function openBrushSizeMenu() {
       title: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuTitle'),
       icon: 'fas fa-paintbrush'
     },
-    position: { width: 280 },
+    position: { width: 280, top: 80, left: 20 },
     content: html,
     buttons: [{
       action: 'done',
@@ -216,12 +240,23 @@ export async function openBrushSizeMenu() {
     if (!root) return;
     const slider = root.querySelector('.table-mode-brush-size-slider');
     const label = root.querySelector('.table-mode-brush-size-value');
-    if (!slider) return;
-    slider.addEventListener('input', async (ev) => {
-      const v = Number(ev.target.value);
-      if (label) label.textContent = String(v);
-      await setBrushSize(v);
-    });
+    const checkbox = root.querySelector('.table-mode-brush-constant-reveal');
+    if (slider) {
+      slider.addEventListener('input', async (ev) => {
+        const v = Number(ev.target.value);
+        if (label) label.textContent = String(v);
+        await setBrushSize(v);
+      });
+    }
+    if (checkbox) {
+      checkbox.addEventListener('change', async (ev) => {
+        try {
+          await game.settings.set(MODULE_ID, CONSTANT_REVEAL_SETTING, !!ev.target.checked);
+        } catch (e) {
+          console.error(`[${MODULE_ID}] Set constant reveal failed`, e);
+        }
+      });
+    }
   });
 }
 
@@ -277,7 +312,8 @@ export async function resetFog() {
   if (!confirmed) return;
 
   try {
-    await scene.update({ fogReset: Date.now() });
+    // V13: scene.fog.reset (legacy: scene.fogReset is deprecated → V14)
+    await scene.update({ 'fog.reset': Date.now() });
     ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.FogReset'));
   } catch (e) {
     console.error(`[${MODULE_ID}] Reset fog failed`, e);
@@ -347,6 +383,7 @@ async function enterPaintMode() {
 
   installCursorOverlay(sizeSquares);
   installCanvasListeners();
+  suppressCanvasPings();
   document.body.classList.add('table-mode-fog-paint-active');
 
   ui.notifications.info(
@@ -357,6 +394,7 @@ async function enterPaintMode() {
 async function exitPaintMode() {
   removeCanvasListeners();
   removeCursorOverlay();
+  restoreCanvasPings();
   document.body.classList.remove('table-mode-fog-paint-active');
 
   // Close size dialog if still open. Flag prevents the close-handler from
@@ -382,6 +420,27 @@ async function exitPaintMode() {
   state.pointerDown = false;
 
   ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.PaintModeExited'));
+}
+
+/* ------------------------------------------------------------------ */
+/* Suppress Foundry's canvas long-press → ping while paint mode active */
+/* ------------------------------------------------------------------ */
+
+function suppressCanvasPings() {
+  if (!canvas) return;
+  // Override the long-press handler that triggers chevron pings.
+  // Save the original so we can restore on exit.
+  if (typeof canvas._onLongPress === 'function' && !state.savedLongPress) {
+    state.savedLongPress = canvas._onLongPress;
+    canvas._onLongPress = function () { /* no-op while painting */ };
+  }
+}
+
+function restoreCanvasPings() {
+  if (canvas && state.savedLongPress) {
+    canvas._onLongPress = state.savedLongPress;
+  }
+  state.savedLongPress = null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -498,9 +557,11 @@ function onMouseDown(ev) {
 async function onMouseUp(_ev) {
   if (!state.pointerDown) return;
   state.pointerDown = false;
-  // Park the brush (disable sight) so the area around the last-painted spot
-  // doesn't show as "currently lit" on the VTT — it falls back to "explored
-  // but out of sight" matching the rest of the painted fog.
+  // If "Constant reveal" is on, leave the brush at last paint position with
+  // sight enabled — that area stays "currently lit". Otherwise, park the
+  // brush (sight off) so the area falls back to "explored but out of sight"
+  // matching the rest of the painted fog.
+  if (getConstantReveal()) return;
   if (!state.brushTokenId) return;
   const tokenDoc = canvas?.scene?.tokens.get(state.brushTokenId);
   if (!tokenDoc) return;
@@ -550,6 +611,7 @@ export function onCanvasTeardown() {
   if (!state.active) return;
   removeCanvasListeners();
   removeCursorOverlay();
+  restoreCanvasPings();
   document.body.classList.remove('table-mode-fog-paint-active');
   if (state.sizeDialog) {
     state.closingDialog = true;
