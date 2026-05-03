@@ -1,0 +1,451 @@
+import { MODULE_ID } from './socket-protocol.js';
+
+/**
+ * Fog Reveal Brush v2 — actor-linked paint-mode brush.
+ *
+ * Lessons from the v0.10/v0.11 attempts:
+ *   - Actor-less brush tokens don't share vision to non-owners → fog never
+ *     revealed on the VTT client. Fixed by linking the brush to a managed
+ *     `_FogBrush` actor with `ownership.default = OBSERVER` so all users
+ *     see through it.
+ *   - Hiding the brush sprite client-side is what works. The vtt-token-hide
+ *     pipeline now treats the `fogBrush` flag as "hide for everyone, GM
+ *     included".
+ *   - Programmatic position updates with `{animate: false}` skip Foundry's
+ *     drag-ruler — so the painted reveal appears instantly without a ghost
+ *     measurement on the VTT.
+ *
+ * Toolbar UX:
+ *   - Paintbrush toggle → enter paint mode
+ *   - In paint mode: native cursor hidden over canvas, PIXI circle follows
+ *     the mouse. Click/drag to reveal fog. Cursor reverts over toolbars.
+ *   - Brush size cycles 10/30/60/120 ft live
+ *   - Reset Fog wraps Foundry's native scene fog reset (with a confirm)
+ */
+
+const FOG_BRUSH_FLAG = 'fogBrush';
+const VTT_HIDDEN_FLAG = 'vttHidden';
+const BRUSH_SIZE_SETTING = 'fogBrushSize';
+const BRUSH_ACTOR_ID_SETTING = 'fogBrushActorId';
+
+const ACTOR_NAME = '_FogBrush';
+const BRUSH_SIZES = [10, 30, 60, 120];
+const DEFAULT_BRUSH_SIZE = 30;
+const PAINT_THROTTLE_MS = 40;
+
+const state = {
+  active: false,
+  brushTokenId: null,
+  cursorGfx: null,
+  pointerDown: false,
+  lastMoveTs: 0,
+  handlers: null,
+  sightActivated: false
+};
+
+/* ------------------------------------------------------------------ */
+/* Settings                                                            */
+/* ------------------------------------------------------------------ */
+
+export function registerBrushSettings() {
+  game.settings.register(MODULE_ID, BRUSH_SIZE_SETTING, {
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: DEFAULT_BRUSH_SIZE
+  });
+  game.settings.register(MODULE_ID, BRUSH_ACTOR_ID_SETTING, {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: ''
+  });
+}
+
+export function getBrushSize() {
+  try {
+    return game.settings.get(MODULE_ID, BRUSH_SIZE_SETTING) ?? DEFAULT_BRUSH_SIZE;
+  } catch (_) {
+    return DEFAULT_BRUSH_SIZE;
+  }
+}
+
+export function isBrushSpawned() {
+  return state.active;
+}
+
+/* ------------------------------------------------------------------ */
+/* Actor management                                                    */
+/* ------------------------------------------------------------------ */
+
+async function ensureBrushActor() {
+  let actorId;
+  try {
+    actorId = game.settings.get(MODULE_ID, BRUSH_ACTOR_ID_SETTING);
+  } catch (_) {
+    actorId = '';
+  }
+  if (actorId) {
+    const existing = game.actors.get(actorId);
+    if (existing) return existing;
+  }
+  // Create the brush actor. Type is system-dependent — use whatever the system
+  // exposes as a generic NPC type, falling back to the first registered type.
+  const types = game.documentTypes?.Actor ?? ['npc'];
+  const type = types.includes('npc') ? 'npc' : (types.includes('character') ? 'character' : types[0]);
+
+  const ownerDisplayNone = CONST?.TOKEN_DISPLAY_MODES?.NONE ?? 0;
+  const observerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OBSERVER ?? 2;
+
+  const actorData = {
+    name: ACTOR_NAME,
+    type,
+    ownership: { default: observerLevel },
+    prototypeToken: {
+      name: ACTOR_NAME,
+      width: 0.5,
+      height: 0.5,
+      displayName: ownerDisplayNone,
+      texture: { src: 'icons/svg/light.svg' },
+      sight: { enabled: false, range: DEFAULT_BRUSH_SIZE, visionMode: 'basic' },
+      flags: {
+        [MODULE_ID]: {
+          [VTT_HIDDEN_FLAG]: true,
+          [FOG_BRUSH_FLAG]: true
+        }
+      }
+    }
+  };
+
+  let actor;
+  try {
+    actor = await Actor.create(actorData);
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Failed to create FogBrush actor`, e);
+    return null;
+  }
+  await game.settings.set(MODULE_ID, BRUSH_ACTOR_ID_SETTING, actor.id);
+  return actor;
+}
+
+/* ------------------------------------------------------------------ */
+/* Toolbar handlers                                                    */
+/* ------------------------------------------------------------------ */
+
+export async function toggleBrush() {
+  if (!game.user.isGM) return;
+  if (state.active) return exitPaintMode();
+  return enterPaintMode();
+}
+
+export async function cycleBrushSize() {
+  if (!game.user.isGM) return;
+  const current = getBrushSize();
+  const idx = BRUSH_SIZES.indexOf(current);
+  const next = BRUSH_SIZES[(idx + 1) % BRUSH_SIZES.length];
+  try {
+    await game.settings.set(MODULE_ID, BRUSH_SIZE_SETTING, next);
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Cycle brush size failed`, e);
+    return;
+  }
+
+  const tokenDoc = state.brushTokenId ? canvas?.scene?.tokens.get(state.brushTokenId) : null;
+  if (tokenDoc) {
+    try {
+      await tokenDoc.update({ 'sight.range': next });
+    } catch (e) {
+      console.error(`[${MODULE_ID}] Update brush sight range failed`, e);
+    }
+  }
+  if (state.cursorGfx) {
+    drawBrushCircle(state.cursorGfx, ftToPixels(next));
+  }
+
+  ui.notifications.info(
+    game.i18n.format('TABLE_MODE.Notifications.BrushSizeChanged', { size: next })
+  );
+}
+
+export async function resetFog() {
+  if (!game.user.isGM) return;
+  const scene = canvas?.scene;
+  if (!scene) return;
+
+  const title = game.i18n.localize('TABLE_MODE.FogBrush.ResetTitle');
+  const content = `<p>${game.i18n.localize('TABLE_MODE.FogBrush.ResetConfirm')}</p>`;
+
+  let confirmed = false;
+  const DialogV2 = foundry.applications?.api?.DialogV2;
+  try {
+    if (DialogV2?.confirm) {
+      confirmed = await DialogV2.confirm({
+        window: { title },
+        content,
+        rejectClose: false,
+        modal: true
+      });
+    } else if (globalThis.Dialog?.confirm) {
+      confirmed = await globalThis.Dialog.confirm({ title, content });
+    } else {
+      confirmed = window.confirm(`${title}\n\n${content.replace(/<[^>]+>/g, '')}`);
+    }
+  } catch (_) {
+    confirmed = false;
+  }
+  if (!confirmed) return;
+
+  try {
+    await scene.update({ fogReset: Date.now() });
+    ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.FogReset'));
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Reset fog failed`, e);
+    ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.FogResetFailed'));
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Paint-mode lifecycle                                                */
+/* ------------------------------------------------------------------ */
+
+async function enterPaintMode() {
+  const scene = canvas?.scene;
+  if (!scene) {
+    ui.notifications.warn(game.i18n.localize('TABLE_MODE.Notifications.NoScene'));
+    return;
+  }
+
+  const actor = await ensureBrushActor();
+  if (!actor) {
+    ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.BrushSpawnFailed'));
+    return;
+  }
+
+  const size = getBrushSize();
+  const dims = scene.dimensions ?? canvas.dimensions ?? {};
+  const spawnX = (dims.sceneX ?? 0) + ((dims.sceneWidth ?? dims.width ?? 4000) / 2);
+  const spawnY = (dims.sceneY ?? 0) + ((dims.sceneHeight ?? dims.height ?? 3000) / 2);
+
+  // Build token data from the actor's prototype, then override what we need.
+  const proto = actor.prototypeToken.toObject();
+  const tokenData = {
+    ...proto,
+    actorId: actor.id,
+    actorLink: false,
+    x: Math.round(spawnX),
+    y: Math.round(spawnY),
+    sight: {
+      ...(proto.sight ?? {}),
+      enabled: false,
+      range: size,
+      visionMode: 'basic'
+    },
+    flags: foundry.utils.mergeObject(
+      proto.flags ?? {},
+      { [MODULE_ID]: { [VTT_HIDDEN_FLAG]: true, [FOG_BRUSH_FLAG]: true } },
+      { inplace: false }
+    )
+  };
+
+  let docs;
+  try {
+    docs = await scene.createEmbeddedDocuments('Token', [tokenData]);
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Spawn brush token failed`, e);
+    ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.BrushSpawnFailed'));
+    return;
+  }
+  const tokenDoc = docs?.[0];
+  if (!tokenDoc) return;
+
+  state.brushTokenId = tokenDoc.id;
+  state.active = true;
+  state.pointerDown = false;
+  state.lastMoveTs = 0;
+  state.sightActivated = false;
+
+  installCursorOverlay(size);
+  installCanvasListeners();
+  document.body.classList.add('table-mode-fog-paint-active');
+
+  ui.notifications.info(
+    game.i18n.format('TABLE_MODE.Notifications.PaintModeEntered', { size })
+  );
+}
+
+async function exitPaintMode() {
+  removeCanvasListeners();
+  removeCursorOverlay();
+  document.body.classList.remove('table-mode-fog-paint-active');
+
+  const scene = canvas?.scene;
+  if (scene && state.brushTokenId) {
+    try {
+      await scene.deleteEmbeddedDocuments('Token', [state.brushTokenId]);
+    } catch (e) {
+      console.error(`[${MODULE_ID}] Despawn brush token failed`, e);
+    }
+  }
+
+  state.brushTokenId = null;
+  state.active = false;
+  state.pointerDown = false;
+  state.sightActivated = false;
+
+  ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.PaintModeExited'));
+}
+
+/* ------------------------------------------------------------------ */
+/* Cursor overlay (PIXI graphics following the mouse)                  */
+/* ------------------------------------------------------------------ */
+
+function ftToPixels(ft) {
+  const scene = canvas?.scene;
+  if (!scene) return 100;
+  const distance = scene.grid?.distance ?? 5;
+  const size = scene.grid?.size ?? 100;
+  return (ft / distance) * size;
+}
+
+function drawBrushCircle(gfx, radius) {
+  gfx.clear();
+  gfx.lineStyle(3, 0xffd700, 1);
+  gfx.beginFill(0xffd700, 0.12);
+  gfx.drawCircle(0, 0, radius);
+  gfx.endFill();
+}
+
+function installCursorOverlay(sizeFt) {
+  const gfx = new PIXI.Graphics();
+  gfx.eventMode = 'none';
+  drawBrushCircle(gfx, ftToPixels(sizeFt));
+  gfx.visible = false;
+  canvas.stage.addChild(gfx);
+  state.cursorGfx = gfx;
+}
+
+function removeCursorOverlay() {
+  if (state.cursorGfx) {
+    try {
+      canvas.stage.removeChild(state.cursorGfx);
+      state.cursorGfx.destroy();
+    } catch (_) {}
+    state.cursorGfx = null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas pointer listeners                                            */
+/* ------------------------------------------------------------------ */
+
+function installCanvasListeners() {
+  const view = canvas?.app?.view;
+  if (!view) return;
+  const handlers = {
+    move: (ev) => onMouseMove(ev),
+    down: (ev) => onMouseDown(ev),
+    up: (ev) => onMouseUp(ev),
+    leave: (ev) => onMouseLeave(ev),
+    contextmenu: (ev) => ev.preventDefault()
+  };
+  view.addEventListener('mousemove', handlers.move, true);
+  view.addEventListener('mousedown', handlers.down, true);
+  window.addEventListener('mouseup', handlers.up, true);
+  view.addEventListener('mouseleave', handlers.leave, true);
+  view.addEventListener('contextmenu', handlers.contextmenu, true);
+  state.handlers = handlers;
+}
+
+function removeCanvasListeners() {
+  if (!state.handlers) return;
+  const view = canvas?.app?.view;
+  if (view) {
+    view.removeEventListener('mousemove', state.handlers.move, true);
+    view.removeEventListener('mousedown', state.handlers.down, true);
+    view.removeEventListener('mouseleave', state.handlers.leave, true);
+    view.removeEventListener('contextmenu', state.handlers.contextmenu, true);
+  }
+  window.removeEventListener('mouseup', state.handlers.up, true);
+  state.handlers = null;
+}
+
+function clientToSceneCoords(clientEvent) {
+  const view = canvas.app.view;
+  const rect = view.getBoundingClientRect();
+  return canvas.stage.toLocal(
+    new PIXI.Point(clientEvent.clientX - rect.left, clientEvent.clientY - rect.top)
+  );
+}
+
+function onMouseMove(ev) {
+  if (!state.active) return;
+  const local = clientToSceneCoords(ev);
+  if (state.cursorGfx) {
+    state.cursorGfx.x = local.x;
+    state.cursorGfx.y = local.y;
+    state.cursorGfx.visible = true;
+  }
+  if (state.pointerDown && (ev.buttons & 1)) {
+    paintAt(local.x, local.y);
+  }
+}
+
+function onMouseDown(ev) {
+  if (!state.active) return;
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  state.pointerDown = true;
+  const local = clientToSceneCoords(ev);
+  paintAt(local.x, local.y, true);
+}
+
+function onMouseUp(_ev) {
+  state.pointerDown = false;
+}
+
+function onMouseLeave(_ev) {
+  if (state.cursorGfx) state.cursorGfx.visible = false;
+  state.pointerDown = false;
+}
+
+async function paintAt(x, y, force = false) {
+  const now = Date.now();
+  if (!force && now - state.lastMoveTs < PAINT_THROTTLE_MS) return;
+  state.lastMoveTs = now;
+
+  if (!state.brushTokenId) return;
+  const tokenDoc = canvas?.scene?.tokens.get(state.brushTokenId);
+  if (!tokenDoc) return;
+
+  // Token x/y is the top-left corner. Center the token under the cursor.
+  const half = (canvas.scene.grid?.size ?? 100) * 0.25;
+  const update = {
+    x: Math.round(x - half),
+    y: Math.round(y - half)
+  };
+  if (!state.sightActivated) {
+    update['sight.enabled'] = true;
+    state.sightActivated = true;
+  }
+  try {
+    await tokenDoc.update(update, { animate: false });
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Paint move failed`, e);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Cleanup if the canvas tears down while paint mode is active        */
+/* ------------------------------------------------------------------ */
+
+export function onCanvasTeardown() {
+  if (!state.active) return;
+  removeCanvasListeners();
+  removeCursorOverlay();
+  document.body.classList.remove('table-mode-fog-paint-active');
+  state.active = false;
+  state.pointerDown = false;
+  state.brushTokenId = null;
+  state.sightActivated = false;
+}

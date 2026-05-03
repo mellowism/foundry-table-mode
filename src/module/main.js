@@ -41,6 +41,10 @@ import {
   onCanvasReady as onVttTokenHideCanvasReady,
   reapplyAll as reapplyVttTokenHide
 } from './vtt-token-hide.js';
+import {
+  registerBrushSettings as registerFogBrushSettings,
+  onCanvasTeardown as onFogBrushCanvasTeardown
+} from './fog-brush.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
@@ -55,6 +59,7 @@ Hooks.once('init', () => {
 
 Hooks.once('ready', () => {
   registerSettings();
+  registerFogBrushSettings();
   console.log(`[${MODULE_ID}] ready — user=${game.user?.name} gm=${game.user?.isGM}`);
 
   game.socket.on(SOCKET_NAME, (msg) => {
@@ -147,4 +152,5 @@ Hooks.on('canvasReady', () => {
 
 Hooks.on('canvasTearDown', () => {
   onViewboxCanvasTeardown();
+  onFogBrushCanvasTeardown();
 });

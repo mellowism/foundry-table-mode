@@ -65,6 +65,14 @@
   border-color: #ffc107 !important;
 }
 
+/* Fog Reveal Brush — paint mode hides the native cursor on the canvas so the
+   PIXI cursor circle is the only visible pointer over the map. UI elements
+   (toolbars, sidebar, dialogs) keep their normal cursor via CSS specificity. */
+body.table-mode-fog-paint-active #board,
+body.table-mode-fog-paint-active canvas#board {
+  cursor: none !important;
+}
+
 /* Embed URL section in journal page edit form */
 .table-mode-embed-url-section {
   border: 1px solid rgba(255, 193, 7, 0.4);

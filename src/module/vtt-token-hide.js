@@ -13,6 +13,7 @@ import { getVttUserId, isDefaultHiddenTokensEnabled } from './settings.js';
  */
 
 const FLAG_KEY = 'vttHidden';
+const FOG_BRUSH_FLAG = 'fogBrush';
 // V13 split Token#target into targetArrows + targetPips. The legacy `target`
 // getter returns targetArrows but logs a deprecation warning every refresh —
 // list the new names directly.
@@ -20,6 +21,10 @@ const VISIBLE_PARTS = ['mesh', 'bars', 'nameplate', 'effects', 'tooltip', 'borde
 
 function isVttHidden(tokenDoc) {
   return !!tokenDoc?.getFlag?.(MODULE_ID, FLAG_KEY);
+}
+
+function isFogBrush(tokenDoc) {
+  return !!tokenDoc?.getFlag?.(MODULE_ID, FOG_BRUSH_FLAG);
 }
 
 function isThisClientTheVtt() {
@@ -42,25 +47,46 @@ function isDefaultHiddenSafe() {
 
 /**
  * Apply the hide state to a rendered token's PIXI children.
- * No-op on GM and on non-VTT clients — they always see the token.
+ *
+ * Two flags drive hiding:
+ *   - `fogBrush` → hidden for EVERYONE (GM and players). Used by the fog
+ *     reveal brush, which needs to be invisible everywhere while still
+ *     contributing vision to the fog system.
+ *   - `vttHidden` → hidden only on the VTT client. Used for the physical-
+ *     minis workflow where the digital token shouldn't show on the table TV
+ *     but other players (and GM) see it normally.
  */
 export function applyHideForToken(token) {
-  if (!token || !isThisClientTheVtt()) return;
-  const hide = isVttHidden(token.document);
+  if (!token) return;
+  const isBrush = isFogBrush(token.document);
+  const isHiddenOnVtt = isVttHidden(token.document);
+  const hide = isBrush || (isHiddenOnVtt && isThisClientTheVtt());
+  if (!hide && !isBrush) {
+    // Make sure parts are visible on this client (if no flag applies)
+    if (!isHiddenOnVtt) {
+      for (const key of VISIBLE_PARTS) {
+        const part = token[key];
+        if (part && part.visible === false) part.visible = true;
+      }
+    }
+    return;
+  }
   for (const key of VISIBLE_PARTS) {
     const part = token[key];
     if (!part) continue;
     part.visible = !hide;
   }
-  // Also block selection/interaction visuals for hidden tokens
   if (hide) {
     if (token.tooltip) token.tooltip.visible = false;
+    // Brush tokens also stop rendering the mesh entirely so even shaders/auras
+    // attached by other modules don't draw a sprite.
+    if (isBrush && token.mesh) token.mesh.renderable = false;
   }
 }
 
-/** Sweep all tokens on the current scene — used on canvasReady and setting flips. */
+/** Sweep all tokens on the current scene — used on canvasReady and setting flips.
+ *  Always runs (not just on VTT) so fogBrush tokens get hidden for the GM too. */
 export function reapplyAll() {
-  if (!isThisClientTheVtt()) return;
   for (const token of canvas?.tokens?.placeables ?? []) {
     applyHideForToken(token);
   }
@@ -70,11 +96,12 @@ export function onDrawToken(token) { applyHideForToken(token); }
 export function onRefreshToken(token) { applyHideForToken(token); }
 
 export function onUpdateToken(tokenDoc, change) {
-  // Re-apply when our flag changes, or when other rendering-relevant fields
-  // change (Foundry resets visibility on some updates).
-  if (!isThisClientTheVtt()) return;
-  const flagPath = `flags.${MODULE_ID}.${FLAG_KEY}`;
-  const flagChanged = foundry.utils.hasProperty(change, flagPath);
+  // Re-apply when our flags change, or when rendering-relevant fields change.
+  // Runs on GM too because fogBrush tokens must stay hidden for everyone.
+  const vttFlagPath = `flags.${MODULE_ID}.${FLAG_KEY}`;
+  const brushFlagPath = `flags.${MODULE_ID}.${FOG_BRUSH_FLAG}`;
+  const flagChanged = foundry.utils.hasProperty(change, vttFlagPath) ||
+                      foundry.utils.hasProperty(change, brushFlagPath);
   const visualsChanged = ['x', 'y', 'hidden', 'texture', 'name', 'displayName'].some(k =>
     foundry.utils.hasProperty(change, k)
   );
