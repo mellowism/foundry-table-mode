@@ -66,20 +66,15 @@ export function registerBrushSettings() {
     type: String,
     default: ''
   });
+  // Setting registered as an no-op for now — was used by the rc.5 "Constant
+  // reveal" checkbox which was removed in rc.6 because keeping the brush lit
+  // turned the GM canvas into player-perspective view. May revisit later.
   game.settings.register(MODULE_ID, CONSTANT_REVEAL_SETTING, {
     scope: 'world',
     config: false,
     type: Boolean,
     default: false
   });
-}
-
-function getConstantReveal() {
-  try {
-    return game.settings.get(MODULE_ID, CONSTANT_REVEAL_SETTING) ?? false;
-  } catch (_) {
-    return false;
-  }
 }
 
 export function getBrushSize() {
@@ -181,7 +176,6 @@ export async function openBrushSizeMenu() {
     return;
   }
 
-  const constant = getConstantReveal();
   const html = `
     <div class="table-mode-brush-size-menu">
       <label style="display:block; margin-bottom:6px;">
@@ -192,13 +186,6 @@ export async function openBrushSizeMenu() {
       <input type="range" min="${MIN_BRUSH_SIZE}" max="${MAX_BRUSH_SIZE}" step="1"
              value="${current}" class="table-mode-brush-size-slider"
              style="width:100%;" />
-      <label style="display:flex; align-items:center; gap:6px; margin-top:10px; cursor:pointer;">
-        <input type="checkbox" class="table-mode-brush-constant-reveal" ${constant ? 'checked' : ''} />
-        <span>${game.i18n.localize('TABLE_MODE.FogBrush.ConstantRevealLabel')}</span>
-      </label>
-      <p style="font-size:11px; opacity:0.7; margin-top:4px;">
-        ${game.i18n.localize('TABLE_MODE.FogBrush.ConstantRevealHint')}
-      </p>
     </div>
   `;
 
@@ -207,7 +194,7 @@ export async function openBrushSizeMenu() {
       title: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuTitle'),
       icon: 'fas fa-paintbrush'
     },
-    position: { width: 280, top: 80, left: 20 },
+    position: { width: 280, top: 80, left: 100 },
     content: html,
     buttons: [{
       action: 'done',
@@ -240,21 +227,11 @@ export async function openBrushSizeMenu() {
     if (!root) return;
     const slider = root.querySelector('.table-mode-brush-size-slider');
     const label = root.querySelector('.table-mode-brush-size-value');
-    const checkbox = root.querySelector('.table-mode-brush-constant-reveal');
     if (slider) {
       slider.addEventListener('input', async (ev) => {
         const v = Number(ev.target.value);
         if (label) label.textContent = String(v);
         await setBrushSize(v);
-      });
-    }
-    if (checkbox) {
-      checkbox.addEventListener('change', async (ev) => {
-        try {
-          await game.settings.set(MODULE_ID, CONSTANT_REVEAL_SETTING, !!ev.target.checked);
-        } catch (e) {
-          console.error(`[${MODULE_ID}] Set constant reveal failed`, e);
-        }
       });
     }
   });
@@ -312,8 +289,9 @@ export async function resetFog() {
   if (!confirmed) return;
 
   try {
-    // V13: scene.fog.reset (legacy: scene.fogReset is deprecated → V14)
-    await scene.update({ 'fog.reset': Date.now() });
+    // V13: canvas.fog.reset() — direct API (scene.fog.reset field-update path
+    // doesn't trigger fog re-init for current canvas)
+    await canvas.fog.reset();
     ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.FogReset'));
   } catch (e) {
     console.error(`[${MODULE_ID}] Reset fog failed`, e);
@@ -428,17 +406,23 @@ async function exitPaintMode() {
 
 function suppressCanvasPings() {
   if (!canvas) return;
-  // Override the long-press handler that triggers chevron pings.
-  // Save the original so we can restore on exit.
-  if (typeof canvas._onLongPress === 'function' && !state.savedLongPress) {
-    state.savedLongPress = canvas._onLongPress;
-    canvas._onLongPress = function () { /* no-op while painting */ };
+  // Override Canvas#ping which is the actual ping-fire entry point in V13.
+  // Both long-press and Ctrl+click pings funnel through it, so a single
+  // override catches all of them. Save and restore on exit.
+  const proto = canvas.constructor?.prototype;
+  if (proto && typeof proto.ping === 'function' && !state.savedLongPress) {
+    state.savedLongPress = proto.ping;
+    proto.ping = function () {
+      if (state.active) return Promise.resolve(false);
+      return state.savedLongPress.apply(this, arguments);
+    };
   }
 }
 
 function restoreCanvasPings() {
-  if (canvas && state.savedLongPress) {
-    canvas._onLongPress = state.savedLongPress;
+  if (state.savedLongPress) {
+    const proto = canvas?.constructor?.prototype;
+    if (proto) proto.ping = state.savedLongPress;
   }
   state.savedLongPress = null;
 }
@@ -557,11 +541,9 @@ function onMouseDown(ev) {
 async function onMouseUp(_ev) {
   if (!state.pointerDown) return;
   state.pointerDown = false;
-  // If "Constant reveal" is on, leave the brush at last paint position with
-  // sight enabled — that area stays "currently lit". Otherwise, park the
-  // brush (sight off) so the area falls back to "explored but out of sight"
-  // matching the rest of the painted fog.
-  if (getConstantReveal()) return;
+  // Park the brush (disable sight) so the area around the last paint spot
+  // doesn't show as "currently lit" — falls back to "explored but out of
+  // sight" matching the rest of the painted fog.
   if (!state.brushTokenId) return;
   const tokenDoc = canvas?.scene?.tokens.get(state.brushTokenId);
   if (!tokenDoc) return;
