@@ -33,7 +33,7 @@
   "TABLE_MODE.FogBrush.ResetTitle": "Reset Fog of War?",
   "TABLE_MODE.FogBrush.ResetConfirm": "This will clear all explored fog on the current scene. Players will need to re-explore. Continue?",
   "TABLE_MODE.Notifications.NoScene": "Table Mode: no active scene.",
-  "TABLE_MODE.Notifications.PaintModeEntered": "Table Mode: paint mode ON ({size} ft). Click/drag on the map to reveal fog.",
+  "TABLE_MODE.Notifications.PaintModeEntered": "Table Mode: paint mode ON ({size} squares). Click/drag on the map to reveal fog.",
   "TABLE_MODE.Notifications.PaintModeExited": "Table Mode: paint mode OFF. Fog stays as revealed.",
   "TABLE_MODE.Notifications.BrushSpawnFailed": "Table Mode: failed to spawn fog brush — see console.",
   "TABLE_MODE.Notifications.BrushSizeChanged": "Table Mode: brush size now {size} squares.",

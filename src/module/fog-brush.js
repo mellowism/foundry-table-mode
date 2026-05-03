@@ -185,7 +185,13 @@ export async function openBrushSizeMenu() {
     },
     position: { width: 280 },
     content: html,
-    buttons: [],
+    buttons: [{
+      action: 'done',
+      label: game.i18n.localize('TABLE_MODE.FogBrush.SizeMenuClose'),
+      icon: 'fas fa-check',
+      default: true,
+      callback: () => true
+    }],
     modal: false,
     rejectClose: false
   });
