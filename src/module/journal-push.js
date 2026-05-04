@@ -2,11 +2,18 @@ import { MODULE_ID, SOCKET_NAME, MSG } from './socket-protocol.js';
 import { getVttUserId } from './settings.js';
 import { toggleEmbedOnVtt, isEmbedActive } from './embed-url.js';
 
-/** GM-side: Map<journalId, { pageId?, anchor? }> — journals currently open on VTT */
+/**
+ * GM-side: Map<journalId, { pageId?, anchor?, elevation? }>
+ * `elevation` carries { page, userId, prev } if we temporarily granted the
+ * VTT user OBSERVER on a page so the sheet could render content. We revert
+ * on close so HUD-toggled note visibility stays consistent across users.
+ */
 const openOnVtt = new Map();
 
 /** VTT-side: Map<journalId, Application> */
 const vttOpenApps = new Map();
+
+const OBSERVER = 2; // CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
 
 function log(...args) { console.log(`[${MODULE_ID}]`, ...args); }
 
@@ -49,6 +56,46 @@ function currentPageInfo(app) {
   return { pageId: firstPage ?? null, anchor: null };
 }
 
+/**
+ * GM-side: grant VTT user OBSERVER on a specific page so the journal sheet
+ * can render its content. Returns { page, userId, prev } so we can revert
+ * the exact prior state — even if it was "no explicit value" (undefined).
+ *
+ * Page-level (not journal-level) because dnd5e's atomic-page model stores
+ * `ownership.default = 0` explicitly on each page, which blocks inheritance
+ * from journal-level grants. Page-level explicit user grant is the only
+ * cascade that reliably reaches the user.
+ */
+async function elevatePagePermission(page, userId) {
+  if (!page || !userId) return null;
+  const targetUser = game.users.get(userId);
+  if (!targetUser) return null;
+  // Skip if already OBSERVER+
+  if (page.testUserPermission?.(targetUser, 'OBSERVER')) return null;
+  const prev = page.ownership?.[userId];
+  try {
+    await page.update({ [`ownership.${userId}`]: OBSERVER });
+    return { page, userId, prev };
+  } catch (e) {
+    console.warn(`[${MODULE_ID}] elevatePagePermission failed`, e);
+    return null;
+  }
+}
+
+async function revertPagePermission(elevation) {
+  if (!elevation) return;
+  const { page, userId, prev } = elevation;
+  // Page may have been deleted between elevate and revert — guard with try/catch
+  try {
+    const update = (prev === undefined)
+      ? { [`ownership.-=${userId}`]: null }
+      : { [`ownership.${userId}`]: prev };
+    await page.update(update);
+  } catch (e) {
+    console.warn(`[${MODULE_ID}] revertPagePermission failed`, e);
+  }
+}
+
 export async function toggleJournalOnVtt(journalId, pageId, anchor) {
   if (!game.user.isGM) return;
   const targetUserId = getVttUserId();
@@ -58,25 +105,33 @@ export async function toggleJournalOnVtt(journalId, pageId, anchor) {
   }
 
   if (openOnVtt.has(journalId)) {
+    // Close path — emit close, then revert any elevation we did on open.
+    const state = openOnVtt.get(journalId);
     emit(MSG.JOURNAL_CLOSE, { journalId, targetUserId });
     openOnVtt.delete(journalId);
+    if (state?.elevation) await revertPagePermission(state.elevation);
     log('Hide on VTT →', journalId);
   } else {
-    // Pre-compute pageIndex against sort-ordered pages so the VTT side has
-    // a deterministic UI-order index alongside the pageId.
+    // Open path. First, elevate VTT user permission on the target page so
+    // the sheet can render content. Then compute pageIndex, emit the socket
+    // open message, and remember the elevation for revert-on-close.
+    const journal = game.journal?.get(journalId);
+    const page = (pageId && journal) ? journal.pages?.get(pageId) : null;
+    const elevation = page ? await elevatePagePermission(page, targetUserId) : null;
+
     let pageIndex = 0;
-    if (pageId) {
-      const journal = game.journal?.get(journalId);
-      if (journal) {
-        const sorted = [...(journal.pages?.contents ?? [])]
-          .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
-        const idx = sorted.findIndex(p => p.id === pageId);
-        if (idx >= 0) pageIndex = idx;
-      }
+    if (pageId && journal) {
+      const sorted = [...(journal.pages?.contents ?? [])]
+        .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+      const idx = sorted.findIndex(p => p.id === pageId);
+      if (idx >= 0) pageIndex = idx;
     }
+
     emit(MSG.JOURNAL_OPEN, { journalId, pageId, pageIndex, anchor, targetUserId });
-    openOnVtt.set(journalId, { pageId, anchor });
-    log('Show on VTT →', journalId, pageId ?? '(default)', `(index: ${pageIndex})`, anchor ? `#${anchor}` : '');
+    openOnVtt.set(journalId, { pageId, anchor, elevation });
+    log('Show on VTT →', journalId, pageId ?? '(default)',
+        `(index: ${pageIndex}${elevation ? ', elevated' : ''})`,
+        anchor ? `#${anchor}` : '');
   }
   refreshButtonsFor(journalId);
 }
@@ -152,27 +207,28 @@ export function onVttJournalRender(app) {
   vttOpenApps.set(doc.id, app);
 }
 
-export function handleJournalState(msg) {
+/** GM-side: VTT closed the sheet. Revert elevation we set on open. */
+export async function handleJournalState(msg) {
   if (!game.user.isGM) return;
   const { payload, senderId } = msg;
   if (senderId === game.user.id) return;
   if (payload.open !== false) return;
   if (!openOnVtt.has(payload.journalId)) return;
+  const state = openOnVtt.get(payload.journalId);
   openOnVtt.delete(payload.journalId);
+  if (state?.elevation) await revertPagePermission(state.elevation);
   refreshButtonsFor(payload.journalId);
   log('VTT reported journal closed', payload.journalId);
 }
 
 /**
  * VTT-side: render the requested journal with the right page + anchor.
- * V13's JournalSheet render() accepts `mode`, `pageId`, `pageIndex`, `anchor`, `tempOwnership`.
- * `tempOwnership: true` lets Foundry grant observer access for this render without
- * persisting an ownership change on the document.
  *
- * `sheet.render()` is async — we await it so the TOC is built before calling
- * `goToPage`. This is more reliable than a setTimeout race against TOC init,
- * which previously caused the sheet to land on the first page when system
- * subclasses (e.g. dnd5e JournalEntrySheet5e) ignored the `pageId` render option.
+ * The GM has already elevated this user's permission on the target page
+ * (see `elevatePagePermission` above). We therefore render with normal
+ * options — no `tempOwnership`, no DOM scroll fallbacks. Atomic single-page
+ * journals render the only page directly; system subclasses that quirk on
+ * multi-page navigation are no longer hit.
  */
 export async function handleJournalOpen(msg) {
   const { payload, senderId } = msg;
@@ -182,28 +238,16 @@ export async function handleJournalOpen(msg) {
   const journal = game.journal?.get(payload.journalId);
   if (!journal) return;
 
-  // Resolve a sort-ordered pageIndex as a fallback, in case the GM didn't send one
-  // (older clients) or the value was lost in transit.
-  let pageIndex = Number.isInteger(payload.pageIndex) ? payload.pageIndex : 0;
-  if (payload.pageId && !Number.isInteger(payload.pageIndex)) {
-    const sorted = [...(journal.pages?.contents ?? [])]
-      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
-    const idx = sorted.findIndex(p => p.id === payload.pageId);
-    if (idx >= 0) pageIndex = idx;
-  }
-
   try {
     const sheet = journal.sheet;
     await sheet.render(true, {
-      mode: 1, // single-page view
+      mode: 1,
       pageId: payload.pageId ?? undefined,
-      pageIndex,
-      anchor: payload.anchor ?? undefined,
-      tempOwnership: true
+      pageIndex: Number.isInteger(payload.pageIndex) ? payload.pageIndex : 0,
+      anchor: payload.anchor ?? undefined
     });
     vttOpenApps.set(payload.journalId, sheet);
 
-    // Now that render has resolved, the TOC is populated — navigate explicitly.
     if (payload.pageId && typeof sheet.goToPage === 'function') {
       try {
         await sheet.goToPage(payload.pageId, { anchor: payload.anchor ?? undefined });
@@ -212,33 +256,9 @@ export async function handleJournalOpen(msg) {
       }
     }
 
-    // Defence-in-depth: dnd5e's `JournalEntrySheet5e` ignores `mode: 1` and
-    // renders the journal in multi-page scrollable mode. `goToPage` does not
-    // always scroll the container in that layout. Explicit scrollIntoView on
-    // the matching `[data-page-id]` element guarantees the right page is at
-    // the top of the viewport. requestAnimationFrame ensures the DOM is
-    // settled when we measure / scroll.
-    if (payload.pageId) {
-      requestAnimationFrame(() => {
-        try {
-          const root = sheet.element;
-          if (!root) return;
-          const sel = `[data-page-id="${payload.pageId}"]`;
-          // Prefer the first match inside the journal content, not the TOC sidebar
-          const target = root.querySelector(`.journal-entry-content ${sel}`)
-                      ?? root.querySelector(`section${sel}`)
-                      ?? root.querySelector(sel);
-          if (target?.scrollIntoView) {
-            target.scrollIntoView({ behavior: 'instant', block: 'start' });
-          }
-        } catch (e) {
-          console.warn(`[${MODULE_ID}] scrollIntoView fallback failed`, e);
-        }
-      });
-    }
-
     log('Journal opened on VTT', payload.journalId,
-        payload.pageId ?? '(default)', `(index: ${pageIndex})`,
+        payload.pageId ?? '(default)',
+        `(index: ${payload.pageIndex ?? 0})`,
         payload.anchor ? `#${payload.anchor}` : '');
   } catch (e) {
     console.warn(`[${MODULE_ID}] failed to open journal`, e);

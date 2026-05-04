@@ -2,6 +2,46 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.12.3] — 2026-05-04
+
+### Fixed — Push-to-VTT now does page-level elevate / revert (decouples HUD visibility from TV-push readability)
+
+After the Frosthold mega-journal was split into 98 atomic single-page journals, the persistent `ownership[vttUserId] = OBSERVER` workaround broke our note-HUD: the VTT user always saw every map note icon regardless of HUD-toggle state. Two grants were fighting — HUD's `ownership.default` toggle vs the persistent VTT user explicit grant.
+
+**Fix:** restore the v0.4.x elevate/revert pattern, but at **page level** (not journal level). Atomic dnd5e pages have `ownership.default = 0` explicit, which blocks inheritance from journal-level grants — so journal-level elevation no longer cascades to pages. Page-level explicit user grant is the only cascade that reliably reaches the user.
+
+- `toggleJournalOnVtt` (GM-side): on open, grant `page.ownership[vttUserId] = OBSERVER` if not already, remember the prior value. Emit socket open. On close, revert to prior value (or remove the key entirely if it was undefined).
+- `handleJournalState` (close from VTT-side): reverts elevation when VTT user closes the sheet manually.
+- `handleJournalOpen` (VTT-side): drops `tempOwnership: true` (didn't work in dnd5e 5.2.5) and the DOM `scrollIntoView` fallback (no longer needed for single-page atomic journals).
+
+**Permission model after this release:**
+
+| Field | Value | Effect |
+|---|---|---|
+| `page.ownership.default` | toggled by note-HUD between 0 ↔ 2 | Icon visibility for all non-GMs (incl VTT user) |
+| `page.ownership[vttUserId]` | set briefly on TV-push, removed on close | Lets TV render content regardless of HUD state |
+
+Two independent permission grants — no longer collide. HUD-hide hides the icon on every non-GM client (TV + player laptops). TV-push still works for HUD-hidden notes because elevation is per-push.
+
+**Migration note:** if you previously ran a script that set persistent `ownership[vttUserId] = OBSERVER` on journals/pages (workaround during 0.12.0–0.12.2), run the cleanup snippet below to remove those grants. Without cleanup, HUD-toggle won't appear to affect VTT (the lingering grants override).
+
+```js
+// Cleanup persistent VTT user grants from atomic journals
+(async () => {
+  const vttUserId = game.settings.get('foundry-table-mode', 'vttUserId');
+  if (!vttUserId) return;
+  for (const j of game.journal.contents) {
+    if (j.ownership?.[vttUserId] !== undefined) {
+      await j.update({ [`ownership.-=${vttUserId}`]: null });
+    }
+    const pageUpdates = j.pages.contents
+      .filter(p => p.ownership?.[vttUserId] !== undefined)
+      .map(p => ({ _id: p.id, [`ownership.-=${vttUserId}`]: null }));
+    if (pageUpdates.length) await j.updateEmbeddedDocuments('JournalEntryPage', pageUpdates);
+  }
+})();
+```
+
 ## [0.12.2] — 2026-05-04
 
 ### Fixed — Show-on-VTT still lands on top in multi-page scrollable mode (B1 follow-up)
