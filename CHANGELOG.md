@@ -2,6 +2,20 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.12.1] — 2026-05-04
+
+### Fixed — Show-on-VTT lands on first page instead of selected page (B1)
+
+Multi-page plain core journals on V13.351 + dnd5e 5.2.5 ignored the targeted `pageId` and rendered the first page on the VTT client. Existed since v0.4.9 — only now surfaced because earlier testing was on Monk's Enhanced Journal documents (different code path).
+
+**Root cause:** `sheet.render(true, {pageId})` is async and returns a Promise. The previous fix scheduled a `goToPage` retry via `setTimeout(..., 200)` that raced against TOC initialisation. When the system subclass (`JournalEntrySheet5e`) ignored the `pageId` render option, the retry fired before the TOC was ready and silently no-op'd.
+
+**Fix:**
+- `handleJournalOpen` is now `async` and awaits `sheet.render()` before calling `goToPage` — guarantees TOC is populated.
+- GM-side `toggleJournalOnVtt` pre-computes `pageIndex` from sort-ordered `journal.pages.contents` and emits it alongside `pageId`.
+- VTT-side render options now include `pageIndex` as defence-in-depth — V13 `JournalSheet.render` accepts `{mode, pageId, pageIndex, anchor, tempOwnership}`.
+- Console logs now include the resolved index: `Show on VTT → {journalId} {pageId} (index: N)`.
+
 ## [0.12.0] — 2026-05-04
 
 ### Added — Fog Reveal Brush + Party Marker

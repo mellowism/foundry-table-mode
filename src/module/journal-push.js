@@ -62,9 +62,21 @@ export async function toggleJournalOnVtt(journalId, pageId, anchor) {
     openOnVtt.delete(journalId);
     log('Hide on VTT →', journalId);
   } else {
-    emit(MSG.JOURNAL_OPEN, { journalId, pageId, anchor, targetUserId });
+    // Pre-compute pageIndex against sort-ordered pages so the VTT side has
+    // a deterministic UI-order index alongside the pageId.
+    let pageIndex = 0;
+    if (pageId) {
+      const journal = game.journal?.get(journalId);
+      if (journal) {
+        const sorted = [...(journal.pages?.contents ?? [])]
+          .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+        const idx = sorted.findIndex(p => p.id === pageId);
+        if (idx >= 0) pageIndex = idx;
+      }
+    }
+    emit(MSG.JOURNAL_OPEN, { journalId, pageId, pageIndex, anchor, targetUserId });
     openOnVtt.set(journalId, { pageId, anchor });
-    log('Show on VTT →', journalId, pageId ?? '(default)', anchor ? `#${anchor}` : '');
+    log('Show on VTT →', journalId, pageId ?? '(default)', `(index: ${pageIndex})`, anchor ? `#${anchor}` : '');
   }
   refreshButtonsFor(journalId);
 }
@@ -153,11 +165,16 @@ export function handleJournalState(msg) {
 
 /**
  * VTT-side: render the requested journal with the right page + anchor.
- * V13's JournalSheet render() accepts `mode`, `pageId`, `anchor`, `tempOwnership`.
+ * V13's JournalSheet render() accepts `mode`, `pageId`, `pageIndex`, `anchor`, `tempOwnership`.
  * `tempOwnership: true` lets Foundry grant observer access for this render without
  * persisting an ownership change on the document.
+ *
+ * `sheet.render()` is async — we await it so the TOC is built before calling
+ * `goToPage`. This is more reliable than a setTimeout race against TOC init,
+ * which previously caused the sheet to land on the first page when system
+ * subclasses (e.g. dnd5e JournalEntrySheet5e) ignored the `pageId` render option.
  */
-export function handleJournalOpen(msg) {
+export async function handleJournalOpen(msg) {
   const { payload, senderId } = msg;
   if (payload?.targetUserId && payload.targetUserId !== game.user.id) return;
   if (senderId === game.user.id) return;
@@ -165,24 +182,39 @@ export function handleJournalOpen(msg) {
   const journal = game.journal?.get(payload.journalId);
   if (!journal) return;
 
+  // Resolve a sort-ordered pageIndex as a fallback, in case the GM didn't send one
+  // (older clients) or the value was lost in transit.
+  let pageIndex = Number.isInteger(payload.pageIndex) ? payload.pageIndex : 0;
+  if (payload.pageId && !Number.isInteger(payload.pageIndex)) {
+    const sorted = [...(journal.pages?.contents ?? [])]
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+    const idx = sorted.findIndex(p => p.id === payload.pageId);
+    if (idx >= 0) pageIndex = idx;
+  }
+
   try {
     const sheet = journal.sheet;
-    sheet.render(true, {
+    await sheet.render(true, {
       mode: 1, // single-page view
       pageId: payload.pageId ?? undefined,
+      pageIndex,
       anchor: payload.anchor ?? undefined,
       tempOwnership: true
     });
     vttOpenApps.set(payload.journalId, sheet);
 
-    // Safety retry: if the render raced TOC init, re-navigate after layout settles.
+    // Now that render has resolved, the TOC is populated — navigate explicitly.
     if (payload.pageId && typeof sheet.goToPage === 'function') {
-      setTimeout(() => {
-        try { sheet.goToPage(payload.pageId, { anchor: payload.anchor ?? undefined }); } catch (_) {}
-      }, 200);
+      try {
+        await sheet.goToPage(payload.pageId, { anchor: payload.anchor ?? undefined });
+      } catch (e) {
+        console.warn(`[${MODULE_ID}] goToPage post-render failed`, e);
+      }
     }
 
-    log('Journal opened on VTT', payload.journalId, payload.pageId ?? '(default)', payload.anchor ? `#${payload.anchor}` : '');
+    log('Journal opened on VTT', payload.journalId,
+        payload.pageId ?? '(default)', `(index: ${pageIndex})`,
+        payload.anchor ? `#${payload.anchor}` : '');
   } catch (e) {
     console.warn(`[${MODULE_ID}] failed to open journal`, e);
   }
