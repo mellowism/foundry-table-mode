@@ -41,6 +41,12 @@ import {
   onCanvasReady as onVttTokenHideCanvasReady,
   reapplyAll as reapplyVttTokenHide
 } from './vtt-token-hide.js';
+import {
+  registerBrushSettings as registerFogBrushSettings,
+  onCanvasTeardown as onFogBrushCanvasTeardown,
+  onPreUpdateTableModeToken,
+  migrateActorsToFolder
+} from './fog-brush.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
@@ -55,6 +61,8 @@ Hooks.once('init', () => {
 
 Hooks.once('ready', () => {
   registerSettings();
+  registerFogBrushSettings();
+  migrateActorsToFolder().catch((e) => console.warn(`[${MODULE_ID}] migrateActorsToFolder`, e));
   console.log(`[${MODULE_ID}] ready — user=${game.user?.name} gm=${game.user?.isGM}`);
 
   game.socket.on(SOCKET_NAME, (msg) => {
@@ -138,6 +146,9 @@ Hooks.on('drawToken', onDrawToken);
 Hooks.on('refreshToken', onRefreshToken);
 Hooks.on('updateToken', onUpdateToken);
 
+// Suppress animation for fog-brush + party-marker tokens on user-drag
+Hooks.on('preUpdateToken', onPreUpdateTableModeToken);
+
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));
   onNoteHudCanvasReady();
@@ -147,4 +158,5 @@ Hooks.on('canvasReady', () => {
 
 Hooks.on('canvasTearDown', () => {
   onViewboxCanvasTeardown();
+  onFogBrushCanvasTeardown();
 });

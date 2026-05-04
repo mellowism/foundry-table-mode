@@ -2,6 +2,47 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.12.0] — 2026-05-04
+
+### Added — Fog Reveal Brush + Party Marker
+
+A complete native-fog-of-war workflow that replaces Simple Fog for the manual-reveal use case.
+
+**Fog Reveal Brush** (toolbar paintbrush icon, GM-only):
+- Click to enter paint mode. Native cursor hidden over canvas; a yellow PIXI circle follows the mouse, sized to the brush radius.
+- Click/drag on the map to reveal native fog of war. Brush radius is configurable (1–20 grid squares) via a non-modal floating slider dialog that auto-opens on paint-mode entry.
+- Brush is an actor-less-but-actor-linked token (`_FogBrush` actor with `ownership.default = OBSERVER`) so vision propagates to the VTT user. Hidden everywhere visually; non-interactive (no selection rectangle on click).
+- Programmatic move with `{animate: false}` — no Foundry drag-ruler, no animation lag. Sight is disabled between strokes (parked) so the area around the last paint position falls back to "explored grey" matching the rest of the painted fog.
+- Long-press / Ctrl+click pings suppressed during paint mode via `Canvas.prototype.ping` override.
+
+**Party Marker** (button inside the size dialog):
+- Toggle button: "Place Party Marker" places a persistent `_PartyMarker` token at the current brush position; "Remove Party Marker" deletes it. Single instance per scene.
+- Visible to GM as a cyan aura icon (1×1 grid square). Invisible on the VTT client (`vttHidden` flag). Provides constant fog reveal in radius via Observer-shared sight.
+- Use-case: "the party is here right now" — area around marker stays "currently lit", rest of painted fog is "explored grey". Matches classic D&D fog-of-war.
+- Marker sight range = current brush size at placement.
+
+**Reset Fog** (toolbar eraser icon, GM-only):
+- Three-step reset: `canvas.fog.reset()` + `scene.update({'fog.reset': Date.now()})` + `canvas.perception.update({refreshVision, refreshLighting, refreshOcclusion}, true)`. All three needed for the canvas to actually redraw across clients.
+
+**Helper-actor housekeeping:**
+- Both `_FogBrush` and `_PartyMarker` actors are auto-created on first use and placed in a `_FoundryTableMode` folder (collapsible from the Actors sidebar).
+- Migration on `ready` moves any pre-existing copies (from earlier branch builds) into the folder.
+
+**Per-token drag-ruler suppression:**
+- V13 introduced `Token.ruler` (BaseTokenRuler). Override `isVisible` getter to return false on flagged tokens — drag-ruler doesn't render on either GM or VTT for fogBrush / partyMarker tokens.
+
+**Removed:**
+- `defaultHiddenTokens` setting still registered for compat, but the v0.10/v0.11 attempts at custom fog brushing are fully superseded by this implementation.
+
+### Changed — VTT-token-hide pipeline refactor
+
+`applyHideForToken` now handles three explicit modes:
+1. `fogBrush` flag → invisible everywhere (mesh + UI)
+2. `partyMarker` flag → on GM: mesh visible, UI hidden (clean cyan icon, no nameplate/elevation/border). On VTT: invisible.
+3. `vttHidden` flag → invisible on VTT client only (legacy behavior, unchanged)
+
+UI parts list expanded to include `ring` and `aura` (dnd5e 5.x token children).
+
 ## [0.9.2] — 2026-05-02
 
 ### Fixed — V13 deprecation spam on token draw/refresh

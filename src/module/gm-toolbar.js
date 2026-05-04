@@ -4,6 +4,7 @@ import { toggleViewbox, isEnabled as isViewboxEnabled } from './viewbox-controll
 import { reloadVtt } from './client-actions.js';
 import { toggleAllVisibility as toggleAllNotes } from './note-hud.js';
 import { toggleAllTokensOnVtt } from './vtt-token-hide.js';
+import { toggleBrush, resetFog, isBrushSpawned } from './fog-brush.js';
 
 function t(key) { return game.i18n.localize(key); }
 
@@ -65,6 +66,21 @@ export function registerSceneControls() {
           icon: 'fas fa-user-secret',
           button: true,
           onChange: () => toggleAllTokensOnVtt()
+        },
+        fogBrush: {
+          name: 'fogBrush',
+          title: t('TABLE_MODE.Controls.FogBrush'),
+          icon: 'fas fa-paintbrush',
+          toggle: true,
+          active: isBrushSpawned(),
+          onChange: () => toggleBrush()
+        },
+        fogReset: {
+          name: 'fogReset',
+          title: t('TABLE_MODE.Controls.FogReset'),
+          icon: 'fas fa-eraser',
+          button: true,
+          onChange: () => resetFog()
         }
       }
     };

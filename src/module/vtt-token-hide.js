@@ -13,13 +13,52 @@ import { getVttUserId, isDefaultHiddenTokensEnabled } from './settings.js';
  */
 
 const FLAG_KEY = 'vttHidden';
-// V13 split Token#target into targetArrows + targetPips. The legacy `target`
-// getter returns targetArrows but logs a deprecation warning every refresh —
-// list the new names directly.
-const VISIBLE_PARTS = ['mesh', 'bars', 'nameplate', 'effects', 'tooltip', 'border', 'targetArrows', 'targetPips'];
+const FOG_BRUSH_FLAG = 'fogBrush';
+const PARTY_MARKER_FLAG = 'partyMarker';
+// UI children (everything except the sprite mesh). dnd5e 5.x adds ring and
+// aura PIXI children that other modules don't always touch — list them too.
+const UI_PARTS = ['bars', 'nameplate', 'effects', 'tooltip', 'border', 'targetArrows', 'targetPips', 'ring', 'aura'];
 
 function isVttHidden(tokenDoc) {
   return !!tokenDoc?.getFlag?.(MODULE_ID, FLAG_KEY);
+}
+
+function isFogBrush(tokenDoc) {
+  return !!tokenDoc?.getFlag?.(MODULE_ID, FOG_BRUSH_FLAG);
+}
+
+function isPartyMarker(tokenDoc) {
+  return !!tokenDoc?.getFlag?.(MODULE_ID, PARTY_MARKER_FLAG);
+}
+
+function setUiVisible(token, visible) {
+  for (const key of UI_PARTS) {
+    const part = token[key];
+    if (!part) continue;
+    part.visible = visible;
+  }
+}
+
+/**
+ * V13: Token.ruler is a BaseTokenRuler instance with an `isVisible` getter
+ * that drives the per-token drag ruler. Override the getter to always return
+ * false so the ruler is never rendered on this client when this token is
+ * dragged (or being dragged by another user).
+ */
+function suppressTokenRuler(token) {
+  const ruler = token.ruler;
+  if (!ruler || ruler._tableModeSuppressed) return;
+  try {
+    Object.defineProperty(ruler, 'isVisible', {
+      get: () => false,
+      configurable: true
+    });
+    ruler.visible = false;
+    ruler._tableModeSuppressed = true;
+  } catch (_) {
+    // Fallback: just kill visible (Foundry's refresh may re-enable it)
+    ruler.visible = false;
+  }
 }
 
 function isThisClientTheVtt() {
@@ -42,25 +81,63 @@ function isDefaultHiddenSafe() {
 
 /**
  * Apply the hide state to a rendered token's PIXI children.
- * No-op on GM and on non-VTT clients — they always see the token.
+ *
+ * Three flags + role drive behavior:
+ *   - `fogBrush` → fully invisible everywhere (mesh + UI hidden, even for GM).
+ *   - `partyMarker` → on GM: mesh visible (gold aura icon shown), UI hidden
+ *     (no nameplate, no elevation tooltip, no border, no target arrows).
+ *     On VTT: fully invisible.
+ *   - `vttHidden` → fully invisible on the VTT client only. Other clients
+ *     (GM, remote players) see the token normally.
  */
 export function applyHideForToken(token) {
-  if (!token || !isThisClientTheVtt()) return;
-  const hide = isVttHidden(token.document);
-  for (const key of VISIBLE_PARTS) {
-    const part = token[key];
-    if (!part) continue;
-    part.visible = !hide;
+  if (!token) return;
+  const doc = token.document;
+  const isBrush = isFogBrush(doc);
+  const isMarker = isPartyMarker(doc);
+  const isHiddenOnVtt = isVttHidden(doc);
+  const onVtt = isThisClientTheVtt();
+
+  if (isBrush) {
+    if (token.mesh) token.mesh.renderable = false;
+    setUiVisible(token, false);
+    suppressTokenRuler(token);
+    // Make the brush non-interactive so Foundry doesn't show a selection
+    // rectangle when clicks land on its bounds during paint mode
+    token.eventMode = 'none';
+    return;
   }
-  // Also block selection/interaction visuals for hidden tokens
-  if (hide) {
-    if (token.tooltip) token.tooltip.visible = false;
+
+  if (isMarker) {
+    if (onVtt) {
+      if (token.mesh) token.mesh.renderable = false;
+      setUiVisible(token, false);
+    } else {
+      // GM keeps mesh visible (gold aura), but hide labels/elevation/etc.
+      if (token.mesh) token.mesh.renderable = true;
+      setUiVisible(token, false);
+    }
+    // Suppress drag ruler on BOTH sides — VTT must not see it, and GM doesn't
+    // need it for the click-to-place workflow either
+    suppressTokenRuler(token);
+    return;
   }
+
+  if (isHiddenOnVtt && onVtt) {
+    if (token.mesh) token.mesh.renderable = false;
+    setUiVisible(token, false);
+    return;
+  }
+
+  // No hide flag applies on this client — restore mesh rendering. Don't force
+  // UI parts visible (Foundry's render pipeline manages them based on
+  // displayName/displayBars settings).
+  if (token.mesh && token.mesh.renderable === false) token.mesh.renderable = true;
 }
 
-/** Sweep all tokens on the current scene — used on canvasReady and setting flips. */
+/** Sweep all tokens on the current scene — used on canvasReady and setting flips.
+ *  Always runs (not just on VTT) so fogBrush tokens get hidden for the GM too. */
 export function reapplyAll() {
-  if (!isThisClientTheVtt()) return;
   for (const token of canvas?.tokens?.placeables ?? []) {
     applyHideForToken(token);
   }
@@ -70,11 +147,15 @@ export function onDrawToken(token) { applyHideForToken(token); }
 export function onRefreshToken(token) { applyHideForToken(token); }
 
 export function onUpdateToken(tokenDoc, change) {
-  // Re-apply when our flag changes, or when other rendering-relevant fields
-  // change (Foundry resets visibility on some updates).
-  if (!isThisClientTheVtt()) return;
-  const flagPath = `flags.${MODULE_ID}.${FLAG_KEY}`;
-  const flagChanged = foundry.utils.hasProperty(change, flagPath);
+  // Re-apply when our flags change, or when rendering-relevant fields change.
+  // Runs on GM too because fogBrush + partyMarker tokens have GM-side hide
+  // behavior (full hide and UI-only hide respectively).
+  const vttFlagPath = `flags.${MODULE_ID}.${FLAG_KEY}`;
+  const brushFlagPath = `flags.${MODULE_ID}.${FOG_BRUSH_FLAG}`;
+  const markerFlagPath = `flags.${MODULE_ID}.${PARTY_MARKER_FLAG}`;
+  const flagChanged = foundry.utils.hasProperty(change, vttFlagPath) ||
+                      foundry.utils.hasProperty(change, brushFlagPath) ||
+                      foundry.utils.hasProperty(change, markerFlagPath);
   const visualsChanged = ['x', 'y', 'hidden', 'texture', 'name', 'displayName'].some(k =>
     foundry.utils.hasProperty(change, k)
   );
