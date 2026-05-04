@@ -44,7 +44,8 @@ import {
 import {
   registerBrushSettings as registerFogBrushSettings,
   onCanvasTeardown as onFogBrushCanvasTeardown,
-  onPreUpdateTableModeToken
+  onPreUpdateTableModeToken,
+  migrateActorsToFolder
 } from './fog-brush.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
@@ -61,6 +62,7 @@ Hooks.once('init', () => {
 Hooks.once('ready', () => {
   registerSettings();
   registerFogBrushSettings();
+  migrateActorsToFolder().catch((e) => console.warn(`[${MODULE_ID}] migrateActorsToFolder`, e));
   console.log(`[${MODULE_ID}] ready — user=${game.user?.name} gm=${game.user?.isGM}`);
 
   game.socket.on(SOCKET_NAME, (msg) => {

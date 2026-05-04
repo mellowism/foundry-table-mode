@@ -149,6 +149,30 @@ async function ensureBrushActor() {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Migrate any pre-existing _FogBrush / _PartyMarker actors into the module
+ * folder. Runs on ready hook — older versions created these in the root.
+ */
+export async function migrateActorsToFolder() {
+  if (!game.user?.isGM) return;
+  const folder = await ensureModuleFolder();
+  if (!folder) return;
+  const updates = [];
+  for (const name of [ACTOR_NAME, PARTY_MARKER_ACTOR_NAME]) {
+    const actor = game.actors.find(a => a.name === name);
+    if (actor && actor.folder?.id !== folder.id) {
+      updates.push({ _id: actor.id, folder: folder.id });
+    }
+  }
+  if (updates.length) {
+    try {
+      await Actor.updateDocuments(updates);
+    } catch (e) {
+      console.warn(`[${MODULE_ID}] Migrate actors to folder failed`, e);
+    }
+  }
+}
+
+/**
  * Ensure a hidden Actor folder exists to keep the module's helper actors
  * (_FogBrush, _PartyMarker) out of the main actor sidebar listing.
  */
