@@ -24,12 +24,14 @@ import { MODULE_ID } from './socket-protocol.js';
  */
 
 const FOG_BRUSH_FLAG = 'fogBrush';
+const PARTY_MARKER_FLAG = 'partyMarker';
 const VTT_HIDDEN_FLAG = 'vttHidden';
 const BRUSH_SIZE_SETTING = 'fogBrushSize';
 const BRUSH_ACTOR_ID_SETTING = 'fogBrushActorId';
-const CONSTANT_REVEAL_SETTING = 'fogBrushConstantReveal';
+const PARTY_MARKER_ACTOR_ID_SETTING = 'partyMarkerActorId';
 
 const ACTOR_NAME = '_FogBrush';
+const PARTY_MARKER_ACTOR_NAME = '_PartyMarker';
 // Brush size is now in GRID SQUARES (not feet) — works across any scene
 // regardless of grid.distance/units. 1 square = grid.size pixels.
 const MIN_BRUSH_SIZE = 1;
@@ -66,14 +68,11 @@ export function registerBrushSettings() {
     type: String,
     default: ''
   });
-  // Setting registered as an no-op for now — was used by the rc.5 "Constant
-  // reveal" checkbox which was removed in rc.6 because keeping the brush lit
-  // turned the GM canvas into player-perspective view. May revisit later.
-  game.settings.register(MODULE_ID, CONSTANT_REVEAL_SETTING, {
+  game.settings.register(MODULE_ID, PARTY_MARKER_ACTOR_ID_SETTING, {
     scope: 'world',
     config: false,
-    type: Boolean,
-    default: false
+    type: String,
+    default: ''
   });
 }
 
@@ -144,6 +143,145 @@ async function ensureBrushActor() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Party Marker — persistent "the party is here" token                 */
+/* ------------------------------------------------------------------ */
+
+async function ensurePartyMarkerActor() {
+  let actorId;
+  try {
+    actorId = game.settings.get(MODULE_ID, PARTY_MARKER_ACTOR_ID_SETTING);
+  } catch (_) {
+    actorId = '';
+  }
+  if (actorId) {
+    const existing = game.actors.get(actorId);
+    if (existing) return existing;
+  }
+  const types = game.documentTypes?.Actor ?? ['npc'];
+  const type = types.includes('npc') ? 'npc' : (types.includes('character') ? 'character' : types[0]);
+  const observerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OBSERVER ?? 2;
+
+  const actorData = {
+    name: PARTY_MARKER_ACTOR_NAME,
+    type,
+    ownership: { default: observerLevel },
+    prototypeToken: {
+      name: PARTY_MARKER_ACTOR_NAME,
+      width: 1,
+      height: 1,
+      displayName: CONST?.TOKEN_DISPLAY_MODES?.NONE ?? 0,
+      texture: { src: 'icons/svg/aura.svg', tint: '#00ccff' },
+      sight: { enabled: true, range: 6, visionMode: 'basic' },
+      flags: {
+        [MODULE_ID]: {
+          [VTT_HIDDEN_FLAG]: true,
+          [PARTY_MARKER_FLAG]: true
+        }
+      }
+    }
+  };
+
+  let actor;
+  try {
+    actor = await Actor.create(actorData);
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Failed to create PartyMarker actor`, e);
+    return null;
+  }
+  await game.settings.set(MODULE_ID, PARTY_MARKER_ACTOR_ID_SETTING, actor.id);
+  return actor;
+}
+
+function findPartyMarkerToken() {
+  const tokens = canvas?.scene?.tokens ?? [];
+  for (const t of tokens) {
+    if (t.getFlag?.(MODULE_ID, PARTY_MARKER_FLAG)) return t;
+  }
+  return null;
+}
+
+export function hasPartyMarker() {
+  return !!findPartyMarkerToken();
+}
+
+/**
+ * Toggle the party marker. If none exists on the current scene → place at the
+ * current brush position with sight enabled. If one exists → remove it.
+ *
+ * Single-instance per scene. Sight range = current brush size.
+ */
+export async function togglePartyMarker() {
+  if (!game.user.isGM) return;
+  const scene = canvas?.scene;
+  if (!scene) {
+    ui.notifications.warn(game.i18n.localize('TABLE_MODE.Notifications.NoScene'));
+    return;
+  }
+
+  const existing = findPartyMarkerToken();
+  if (existing) {
+    try {
+      await scene.deleteEmbeddedDocuments('Token', [existing.id]);
+      ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.PartyMarkerRemoved'));
+    } catch (e) {
+      console.error(`[${MODULE_ID}] Remove party marker failed`, e);
+    }
+    return;
+  }
+
+  // Place new marker at current brush position (or scene center if no brush)
+  let x, y;
+  const brushDoc = state.brushTokenId ? scene.tokens.get(state.brushTokenId) : null;
+  if (brushDoc) {
+    x = brushDoc.x;
+    y = brushDoc.y;
+  } else {
+    const dims = scene.dimensions ?? canvas.dimensions ?? {};
+    x = Math.round((dims.sceneX ?? 0) + ((dims.sceneWidth ?? dims.width ?? 4000) / 2));
+    y = Math.round((dims.sceneY ?? 0) + ((dims.sceneHeight ?? dims.height ?? 3000) / 2));
+  }
+
+  const actor = await ensurePartyMarkerActor();
+  if (!actor) {
+    ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.PartyMarkerSpawnFailed'));
+    return;
+  }
+
+  const sizeSquares = getBrushSize();
+  const sightRange = squaresToSceneUnits(sizeSquares);
+  const proto = actor.prototypeToken.toObject();
+  const data = {
+    ...proto,
+    actorId: actor.id,
+    actorLink: false,
+    x: Math.round(x),
+    y: Math.round(y),
+    sight: {
+      ...(proto.sight ?? {}),
+      enabled: true,
+      range: sightRange,
+      visionMode: 'basic'
+    },
+    flags: foundry.utils.mergeObject(
+      proto.flags ?? {},
+      { [MODULE_ID]: { [VTT_HIDDEN_FLAG]: true, [PARTY_MARKER_FLAG]: true } },
+      { inplace: false }
+    )
+  };
+
+  try {
+    await scene.createEmbeddedDocuments('Token', [data]);
+    ui.notifications.info(game.i18n.localize('TABLE_MODE.Notifications.PartyMarkerPlaced'));
+  } catch (e) {
+    console.error(`[${MODULE_ID}] Place party marker failed`, e);
+    ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.PartyMarkerSpawnFailed'));
+  }
+
+  // Refresh dialog so the button label updates
+  if (state.sizeDialog?.rendered) state.sizeDialog.render();
+}
+
+/* ------------------------------------------------------------------ */
 /* Toolbar handlers                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -176,6 +314,12 @@ export async function openBrushSizeMenu() {
     return;
   }
 
+  const markerExists = hasPartyMarker();
+  const markerLabel = markerExists
+    ? game.i18n.localize('TABLE_MODE.FogBrush.RemovePartyMarker')
+    : game.i18n.localize('TABLE_MODE.FogBrush.PlacePartyMarker');
+  const markerIcon = markerExists ? 'fa-trash' : 'fa-map-pin';
+
   const html = `
     <div class="table-mode-brush-size-menu">
       <label style="display:block; margin-bottom:6px;">
@@ -186,6 +330,14 @@ export async function openBrushSizeMenu() {
       <input type="range" min="${MIN_BRUSH_SIZE}" max="${MAX_BRUSH_SIZE}" step="1"
              value="${current}" class="table-mode-brush-size-slider"
              style="width:100%;" />
+      <button type="button" class="table-mode-party-marker-toggle"
+              style="width:100%; margin-top:10px;">
+        <i class="fas ${markerIcon}"></i>
+        ${markerLabel}
+      </button>
+      <p style="font-size:11px; opacity:0.7; margin-top:4px;">
+        ${game.i18n.localize('TABLE_MODE.FogBrush.PartyMarkerHint')}
+      </p>
     </div>
   `;
 
@@ -227,11 +379,18 @@ export async function openBrushSizeMenu() {
     if (!root) return;
     const slider = root.querySelector('.table-mode-brush-size-slider');
     const label = root.querySelector('.table-mode-brush-size-value');
+    const markerBtn = root.querySelector('.table-mode-party-marker-toggle');
     if (slider) {
       slider.addEventListener('input', async (ev) => {
         const v = Number(ev.target.value);
         if (label) label.textContent = String(v);
         await setBrushSize(v);
+      });
+    }
+    if (markerBtn) {
+      markerBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        await togglePartyMarker();
       });
     }
   });
