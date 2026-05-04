@@ -43,7 +43,8 @@ import {
 } from './vtt-token-hide.js';
 import {
   registerBrushSettings as registerFogBrushSettings,
-  onCanvasTeardown as onFogBrushCanvasTeardown
+  onCanvasTeardown as onFogBrushCanvasTeardown,
+  onPreUpdateTableModeToken
 } from './fog-brush.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
@@ -142,6 +143,9 @@ Hooks.on('renderTokenHUD', onRenderTokenHUD);
 Hooks.on('drawToken', onDrawToken);
 Hooks.on('refreshToken', onRefreshToken);
 Hooks.on('updateToken', onUpdateToken);
+
+// Suppress animation for fog-brush + party-marker tokens on user-drag
+Hooks.on('preUpdateToken', onPreUpdateTableModeToken);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));

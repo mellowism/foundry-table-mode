@@ -110,13 +110,15 @@ async function ensureBrushActor() {
 
   const ownerDisplayNone = CONST?.TOKEN_DISPLAY_MODES?.NONE ?? 0;
   const observerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OBSERVER ?? 2;
+  const folder = await ensureModuleFolder();
 
   const actorData = {
     name: ACTOR_NAME,
     type,
+    folder: folder?.id ?? null,
     ownership: { default: observerLevel },
     prototypeToken: {
-      name: ACTOR_NAME,
+      name: '',
       width: 0.5,
       height: 0.5,
       displayName: ownerDisplayNone,
@@ -146,6 +148,28 @@ async function ensureBrushActor() {
 /* Party Marker — persistent "the party is here" token                 */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Ensure a hidden Actor folder exists to keep the module's helper actors
+ * (_FogBrush, _PartyMarker) out of the main actor sidebar listing.
+ */
+async function ensureModuleFolder() {
+  const existing = game.folders.find(
+    f => f.type === 'Actor' && f.name === '_FoundryTableMode'
+  );
+  if (existing) return existing;
+  try {
+    return await Folder.create({
+      name: '_FoundryTableMode',
+      type: 'Actor',
+      sorting: 'a',
+      color: '#444444'
+    });
+  } catch (e) {
+    console.warn(`[${MODULE_ID}] Could not create module folder`, e);
+    return null;
+  }
+}
+
 async function ensurePartyMarkerActor() {
   let actorId;
   try {
@@ -160,16 +184,19 @@ async function ensurePartyMarkerActor() {
   const types = game.documentTypes?.Actor ?? ['npc'];
   const type = types.includes('npc') ? 'npc' : (types.includes('character') ? 'character' : types[0]);
   const observerLevel = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OBSERVER ?? 2;
+  const folder = await ensureModuleFolder();
 
   const actorData = {
     name: PARTY_MARKER_ACTOR_NAME,
     type,
+    folder: folder?.id ?? null,
     ownership: { default: observerLevel },
     prototypeToken: {
-      name: PARTY_MARKER_ACTOR_NAME,
+      name: '',
       width: 1,
       height: 1,
       displayName: CONST?.TOKEN_DISPLAY_MODES?.NONE ?? 0,
+      displayBars: CONST?.TOKEN_DISPLAY_MODES?.NONE ?? 0,
       texture: { src: 'icons/svg/aura.svg', tint: '#00ccff' },
       sight: { enabled: true, range: 6, visionMode: 'basic' },
       flags: {
@@ -277,8 +304,22 @@ export async function togglePartyMarker() {
     ui.notifications.error(game.i18n.localize('TABLE_MODE.Notifications.PartyMarkerSpawnFailed'));
   }
 
-  // Refresh dialog so the button label updates
-  if (state.sizeDialog?.rendered) state.sizeDialog.render();
+  // Update the dialog button label/icon directly without a full re-render
+  // (DialogV2.render with a `content` string doesn't pick up dynamic changes)
+  refreshPartyMarkerButton();
+}
+
+function refreshPartyMarkerButton() {
+  const root = state.sizeDialog?.element;
+  if (!root) return;
+  const btn = root.querySelector('.table-mode-party-marker-toggle');
+  if (!btn) return;
+  const exists = hasPartyMarker();
+  const label = exists
+    ? game.i18n.localize('TABLE_MODE.FogBrush.RemovePartyMarker')
+    : game.i18n.localize('TABLE_MODE.FogBrush.PlacePartyMarker');
+  const icon = exists ? 'fa-trash' : 'fa-map-pin';
+  btn.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -747,6 +788,25 @@ async function paintAt(x, y, force = false) {
     await tokenDoc.update(update, { animate: false });
   } catch (e) {
     console.error(`[${MODULE_ID}] Paint move failed`, e);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Disable token-move animation for our flagged tokens                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Hooked on preUpdateToken. When the GM drags a fogBrush or partyMarker
+ * token via the standard token-drag UX, Foundry would normally animate the
+ * movement and show the drag-ruler. Force `animate: false` in the operation
+ * options so the move is instantaneous, matching the brush's programmatic
+ * teleport behavior.
+ */
+export function onPreUpdateTableModeToken(tokenDoc, _change, options) {
+  const isMarker = tokenDoc.getFlag?.(MODULE_ID, PARTY_MARKER_FLAG);
+  const isBrush = tokenDoc.getFlag?.(MODULE_ID, FOG_BRUSH_FLAG);
+  if (isMarker || isBrush) {
+    options.animate = false;
   }
 }
 
