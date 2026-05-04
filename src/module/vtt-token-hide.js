@@ -39,6 +39,28 @@ function setUiVisible(token, visible) {
   }
 }
 
+/**
+ * V13: Token.ruler is a BaseTokenRuler instance with an `isVisible` getter
+ * that drives the per-token drag ruler. Override the getter to always return
+ * false so the ruler is never rendered on this client when this token is
+ * dragged (or being dragged by another user).
+ */
+function suppressTokenRuler(token) {
+  const ruler = token.ruler;
+  if (!ruler || ruler._tableModeSuppressed) return;
+  try {
+    Object.defineProperty(ruler, 'isVisible', {
+      get: () => false,
+      configurable: true
+    });
+    ruler.visible = false;
+    ruler._tableModeSuppressed = true;
+  } catch (_) {
+    // Fallback: just kill visible (Foundry's refresh may re-enable it)
+    ruler.visible = false;
+  }
+}
+
 function isThisClientTheVtt() {
   // Settings register at `ready`, but canvasReady can fire earlier. Reading
   // an unregistered setting throws — return false in that early window.
@@ -79,6 +101,7 @@ export function applyHideForToken(token) {
   if (isBrush) {
     if (token.mesh) token.mesh.renderable = false;
     setUiVisible(token, false);
+    suppressTokenRuler(token);
     return;
   }
 
@@ -91,6 +114,9 @@ export function applyHideForToken(token) {
       if (token.mesh) token.mesh.renderable = true;
       setUiVisible(token, false);
     }
+    // Suppress drag ruler on BOTH sides — VTT must not see it, and GM doesn't
+    // need it for the click-to-place workflow either
+    suppressTokenRuler(token);
     return;
   }
 
