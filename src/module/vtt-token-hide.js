@@ -102,6 +102,9 @@ export function applyHideForToken(token) {
     if (token.mesh) token.mesh.renderable = false;
     setUiVisible(token, false);
     suppressTokenRuler(token);
+    // Make the brush non-interactive so Foundry doesn't show a selection
+    // rectangle when clicks land on its bounds during paint mode
+    token.eventMode = 'none';
     return;
   }
 

@@ -277,6 +277,7 @@ export async function togglePartyMarker() {
     } catch (e) {
       console.error(`[${MODULE_ID}] Remove party marker failed`, e);
     }
+    refreshPartyMarkerButton();
     return;
   }
 
