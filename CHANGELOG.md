@@ -2,6 +2,19 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.12.2] — 2026-05-04
+
+### Fixed — Show-on-VTT still lands on top in multi-page scrollable mode (B1 follow-up)
+
+v0.12.1 fixed the Promise/TOC race but the bug persisted on multi-page journals using dnd5e's `JournalEntrySheet5e`. That subclass ignores the `mode: 1` (single-page) render option and forces multi-page scrollable rendering; `goToPage` then fails to scroll the container to the targeted page.
+
+**Fix:** after `await render` + `await goToPage`, schedule a `requestAnimationFrame` that calls `scrollIntoView({block: 'start'})` on the matching `[data-page-id]` element inside the journal content. Bypasses the system subclass's incomplete navigation by working at the DOM level.
+
+Verified diagnostic from the field (Frosthold journal, 99 pages):
+- GM log: `Show on VTT → zBhbqr3kZIvRRGG1 QiAtDJL9xWoi65Zy (index: 15)` ✅
+- VTT log: `Journal opened on VTT … (index: 15)` ✅
+- Sheet rendered in multi-page scrollable mode despite `mode: 1` request — needed DOM-level scroll fallback.
+
 ## [0.12.1] — 2026-05-04
 
 ### Fixed — Show-on-VTT lands on first page instead of selected page (B1)

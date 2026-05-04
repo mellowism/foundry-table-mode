@@ -212,6 +212,31 @@ export async function handleJournalOpen(msg) {
       }
     }
 
+    // Defence-in-depth: dnd5e's `JournalEntrySheet5e` ignores `mode: 1` and
+    // renders the journal in multi-page scrollable mode. `goToPage` does not
+    // always scroll the container in that layout. Explicit scrollIntoView on
+    // the matching `[data-page-id]` element guarantees the right page is at
+    // the top of the viewport. requestAnimationFrame ensures the DOM is
+    // settled when we measure / scroll.
+    if (payload.pageId) {
+      requestAnimationFrame(() => {
+        try {
+          const root = sheet.element;
+          if (!root) return;
+          const sel = `[data-page-id="${payload.pageId}"]`;
+          // Prefer the first match inside the journal content, not the TOC sidebar
+          const target = root.querySelector(`.journal-entry-content ${sel}`)
+                      ?? root.querySelector(`section${sel}`)
+                      ?? root.querySelector(sel);
+          if (target?.scrollIntoView) {
+            target.scrollIntoView({ behavior: 'instant', block: 'start' });
+          }
+        } catch (e) {
+          console.warn(`[${MODULE_ID}] scrollIntoView fallback failed`, e);
+        }
+      });
+    }
+
     log('Journal opened on VTT', payload.journalId,
         payload.pageId ?? '(default)', `(index: ${pageIndex})`,
         payload.anchor ? `#${payload.anchor}` : '');
