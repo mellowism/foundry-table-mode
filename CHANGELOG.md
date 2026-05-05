@@ -2,6 +2,22 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.12.4] — 2026-05-05
+
+### Fixed — Iframe embed: user-toggleable host chrome clip
+
+The iframe-clip trick that hides Homebrewery's persistent navbar (`top: -90px` shift inside `overflow: hidden`) also clipped MOTD banners — including their dismiss "X" — making it impossible to dismiss a Homebrewery MOTD from within a pushed embed. Once the MOTD appeared, the iframe was unusable until the cookie expired (often days).
+
+**Fix:** added a small chrome-toggle button (top-right corner of the iframe wrap) on the VTT client. Click toggles between clipped (default) and full-iframe view. State persists in `localStorage` (`foundry-table-mode.embed.clipActive`). Workflow:
+
+1. MOTD appears in pushed brew → click toggle → full iframe shows, MOTD X reachable
+2. Click X to dismiss MOTD (cookie set on `homebrewery.naturalcrit.com` for days)
+3. Click toggle again → re-clip → navbar hidden, content clean
+
+The toggle button appears amber when chrome is shown (visual cue that clip is off).
+
+CSS refactor: removed `.table-mode-embed-iframe-clipped` class in favour of `[data-clipped="true|false"]` attribute selector on the wrapper.
+
 ## [0.12.3] — 2026-05-04
 
 ### Fixed — Push-to-VTT now does page-level elevate / revert (decouples HUD visibility from TV-push readability)

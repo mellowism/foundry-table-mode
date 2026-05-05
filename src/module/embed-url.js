@@ -137,6 +137,29 @@ function escapeAttr(s) {
   return String(s).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 }
 
+const CLIP_PREF_KEY = `${MODULE_ID}.embed.clipActive`;
+
+function readClipPref() {
+  try {
+    const v = localStorage.getItem(CLIP_PREF_KEY);
+    if (v === 'false') return 'false';
+  } catch (_) {}
+  return 'true';
+}
+
+function writeClipPref(state) {
+  try { localStorage.setItem(CLIP_PREF_KEY, state ? 'true' : 'false'); } catch (_) {}
+}
+
+function onToggleChrome(ev) {
+  ev?.preventDefault?.();
+  const wrap = ev.currentTarget?.closest?.('.table-mode-embed-iframe-wrap');
+  if (!wrap) return;
+  const next = wrap.getAttribute('data-clipped') === 'true' ? 'false' : 'true';
+  wrap.setAttribute('data-clipped', next);
+  writeClipPref(next === 'true');
+}
+
 /* =========================================================
  * VTT-side: ApplicationV2 window with iframe
  * ========================================================= */
@@ -196,13 +219,22 @@ function buildAppClass() {
       }
       const clip = Math.max(0, this._clipTop | 0);
       if (clip > 0) {
-        return `<div class="table-mode-embed-iframe-wrap" style="--tm-clip-top:${clip}px"><iframe class="table-mode-embed-iframe table-mode-embed-iframe-clipped" src="${safe}" allow="fullscreen"></iframe></div>`;
+        const clipped = readClipPref();
+        const tip = escapeAttr(t('TABLE_MODE.EmbedFrame.ToggleChromeTip'));
+        return `<div class="table-mode-embed-iframe-wrap" data-clipped="${clipped}" style="--tm-clip-top:${clip}px">
+          <iframe class="table-mode-embed-iframe" src="${safe}" allow="fullscreen"></iframe>
+          <button type="button" class="table-mode-embed-chrome-toggle" title="${tip}" aria-label="${tip}">
+            <i class="fas fa-window-restore"></i>
+          </button>
+        </div>`;
       }
       return `<iframe class="table-mode-embed-iframe" src="${safe}" allow="fullscreen"></iframe>`;
     }
 
     _replaceHTML(html, content, _options) {
       content.innerHTML = html;
+      const btn = content.querySelector('.table-mode-embed-chrome-toggle');
+      if (btn) btn.addEventListener('click', onToggleChrome);
     }
 
     async _onClose(options) {

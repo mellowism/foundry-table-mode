@@ -99,20 +99,53 @@ body.table-mode-fog-paint-active canvas#board {
   background: #fff;
   display: block;
 }
-/* Clip-top wrapper — pulls iframe up to hide host chrome (e.g. Homebrewery navbar) */
+/* Clip-top wrapper — pulls iframe up to hide host chrome (e.g. Homebrewery navbar).
+   Toggle via the chrome-toggle button (data-clipped="true|false"). */
 .table-mode-embed-iframe-wrap {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
-.table-mode-embed-iframe-clipped {
-  position: absolute;
+.table-mode-embed-iframe-wrap > .table-mode-embed-iframe {
+  position: relative;
   left: 0;
-  top: calc(0px - var(--tm-clip-top, 0px));
+  top: 0;
   width: 100%;
-  height: calc(100% + var(--tm-clip-top, 0px));
+  height: 100%;
   border: 0;
+}
+.table-mode-embed-iframe-wrap[data-clipped="true"] > .table-mode-embed-iframe {
+  position: absolute;
+  top: calc(0px - var(--tm-clip-top, 0px));
+  height: calc(100% + var(--tm-clip-top, 0px));
+}
+.table-mode-embed-chrome-toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.table-mode-embed-chrome-toggle:hover {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.6);
+}
+.table-mode-embed-iframe-wrap[data-clipped="false"] .table-mode-embed-chrome-toggle {
+  background: rgba(255, 220, 90, 0.95);
+  border-color: rgba(150, 100, 0, 0.85);
 }
 .table-mode-embed-image-wrap {
   width: 100%;

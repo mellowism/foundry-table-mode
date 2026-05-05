@@ -60,5 +60,6 @@
   "TABLE_MODE.EmbedUrl.NoUrlSet": "Table Mode: no embed URL set on this page.",
   "TABLE_MODE.EmbedUrl.NothingToReload": "Table Mode: no active TV embed to reload.",
   "TABLE_MODE.EmbedUrl.Reloaded": "Table Mode: TV embed reloaded.",
-  "TABLE_MODE.EmbedFrame.DefaultTitle": "Table Mode — Embed"
+  "TABLE_MODE.EmbedFrame.DefaultTitle": "Table Mode — Embed",
+  "TABLE_MODE.EmbedFrame.ToggleChromeTip": "Toggle host chrome — show full iframe (to dismiss host modals such as Homebrewery's MOTD), or re-clip to hide the navbar."
 }
