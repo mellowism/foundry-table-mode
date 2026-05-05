@@ -1,6 +1,6 @@
 {
   "name": "foundry-table-mode",
-  "version": "0.12.4",
+  "version": "0.12.5",
   "description": "Foundry VTT V13 module — orchestration for in-person table-TV setups.",
   "private": true,
   "type": "module",

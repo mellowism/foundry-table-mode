@@ -6,7 +6,8 @@ export const SETTINGS = {
   VTT_ASPECT: 'vttAspect',
   HIDE_UI: 'hideUi',
   HIDE_GM_CURSOR: 'hideGmCursor',
-  DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens'
+  DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens',
+  EMBED_CLIP_HOST_CHROME: 'embedClipHostChrome'
 };
 
 const ASPECT_PRESETS = {
@@ -75,6 +76,13 @@ export function registerSettings() {
     scope: 'world', config: true, type: Boolean,
     default: false, requiresReload: false
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.EMBED_CLIP_HOST_CHROME, {
+    name: game.i18n.localize('TABLE_MODE.Settings.EmbedClipHostChrome.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.EmbedClipHostChrome.Hint'),
+    scope: 'world', config: true, type: Boolean,
+    default: true, requiresReload: false
+  });
 }
 
 export function getVttUserId() {
@@ -95,4 +103,7 @@ export function isHideGmCursorEnabled() {
 }
 export function isDefaultHiddenTokensEnabled() {
   return game.settings.get(MODULE_ID, SETTINGS.DEFAULT_HIDDEN_TOKENS);
+}
+export function isEmbedClipChromeEnabled() {
+  return game.settings.get(MODULE_ID, SETTINGS.EMBED_CLIP_HOST_CHROME);
 }

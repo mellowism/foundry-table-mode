@@ -2,6 +2,24 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.12.5] — 2026-05-05
+
+### Changed — Iframe chrome clip is now a settings toggle (replaces v0.12.4 in-frame button)
+
+v0.12.4 introduced a chrome-toggle button overlaid on the iframe wrap. In practice the button cluttered the TV display and the rendering reordered the iframe layout in a way that broke fine-tuned scroll/header hiding for the default (clipped) state.
+
+**This release reverts to v0.12.3 iframe / CSS behaviour exactly** (clip class + wrapper, untouched), and replaces the in-frame button with a single world-scoped boolean module setting:
+
+> **Clip host chrome from iframe embeds** — default ON. Disable temporarily to dismiss a host MOTD (Homebrewery, etc.), then re-enable.
+
+Workflow when a MOTD lands inside the clipped region:
+1. Module Settings → uncheck **Clip host chrome from iframe embeds**
+2. Re-push the embed (TV-icon off / on)
+3. Dismiss the host MOTD on the iframe (cookie persists for days)
+4. Re-check the setting → next push is clipped again
+
+The setting is read GM-side in `clipTopForHost` — when off, `clipTop = 0` is sent in the socket message, so the VTT-side renders an unclipped iframe with no wrapper. No client-side state, no overlay button.
+
 ## [0.12.4] — 2026-05-05
 
 ### Fixed — Iframe embed: user-toggleable host chrome clip

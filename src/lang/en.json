@@ -61,5 +61,6 @@
   "TABLE_MODE.EmbedUrl.NothingToReload": "Table Mode: no active TV embed to reload.",
   "TABLE_MODE.EmbedUrl.Reloaded": "Table Mode: TV embed reloaded.",
   "TABLE_MODE.EmbedFrame.DefaultTitle": "Table Mode — Embed",
-  "TABLE_MODE.EmbedFrame.ToggleChromeTip": "Toggle host chrome — show full iframe (to dismiss host modals such as Homebrewery's MOTD), or re-clip to hide the navbar."
+  "TABLE_MODE.Settings.EmbedClipHostChrome.Name": "Clip host chrome from iframe embeds",
+  "TABLE_MODE.Settings.EmbedClipHostChrome.Hint": "When enabled (default), the iframe embed pulls known hosts (e.g. Homebrewery) up to hide their navbar / scrollbar — clean look on the TV. Disable temporarily when a host MOTD or modal lands inside the clipped region and needs dismissing — turn off, push embed, dismiss the modal, turn back on. Affects iframe embeds only; image embeds are unaffected."
 }
