@@ -22,6 +22,12 @@ import {
 } from './journal-push.js';
 import { installNoteHud, onCanvasReady as onNoteHudCanvasReady } from './note-hud.js';
 import {
+  onDrawNote,
+  onRefreshNote,
+  reapplyAllNoteLabels,
+  onCanvasReady as onNoteLabelsCanvasReady
+} from './note-labels.js';
+import {
   onRenderJournalPageSheet as onRenderEmbedPageSheet,
   handleEmbedOpen,
   handleEmbedClose,
@@ -51,6 +57,7 @@ import {
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
 const VTT_TOKEN_HIDE_SETTING_KEYS = new Set(['vttUserId']);
+const NOTE_LABELS_SETTING_KEYS = new Set(['alwaysShowNoteLabels', 'vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -106,6 +113,7 @@ Hooks.once('ready', () => {
   // can fire before this hook, in which case the early reapplyAll() bailed
   // out (settings reads throw before ready). Catch up here.
   reapplyVttTokenHide();
+  reapplyAllNoteLabels();
 });
 
 Hooks.on('updateSetting', (setting) => {
@@ -116,6 +124,7 @@ Hooks.on('updateSetting', (setting) => {
   if (UI_SETTING_KEYS.has(shortKey)) applyUiCleanup();
   if (GM_CURSOR_SETTING_KEYS.has(shortKey)) onHideGmCursorSettingChange();
   if (VTT_TOKEN_HIDE_SETTING_KEYS.has(shortKey)) reapplyVttTokenHide();
+  if (NOTE_LABELS_SETTING_KEYS.has(shortKey)) reapplyAllNoteLabels();
 });
 
 
@@ -149,11 +158,16 @@ Hooks.on('updateToken', onUpdateToken);
 // Suppress animation for fog-brush + party-marker tokens on user-drag
 Hooks.on('preUpdateToken', onPreUpdateTableModeToken);
 
+// Map note labels — force visible on the VTT client when setting is on
+Hooks.on('drawNote', onDrawNote);
+Hooks.on('refreshNote', onRefreshNote);
+
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));
   onNoteHudCanvasReady();
   onHideGmCursorCanvasReady();
   onVttTokenHideCanvasReady();
+  onNoteLabelsCanvasReady();
 });
 
 Hooks.on('canvasTearDown', () => {

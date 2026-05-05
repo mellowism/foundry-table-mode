@@ -7,7 +7,8 @@ export const SETTINGS = {
   HIDE_UI: 'hideUi',
   HIDE_GM_CURSOR: 'hideGmCursor',
   DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens',
-  EMBED_CLIP_HOST_CHROME: 'embedClipHostChrome'
+  EMBED_CLIP_HOST_CHROME: 'embedClipHostChrome',
+  ALWAYS_SHOW_NOTE_LABELS: 'alwaysShowNoteLabels'
 };
 
 const ASPECT_PRESETS = {
@@ -83,6 +84,13 @@ export function registerSettings() {
     scope: 'world', config: true, type: Boolean,
     default: true, requiresReload: false
   });
+
+  game.settings.register(MODULE_ID, SETTINGS.ALWAYS_SHOW_NOTE_LABELS, {
+    name: game.i18n.localize('TABLE_MODE.Settings.AlwaysShowNoteLabels.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.AlwaysShowNoteLabels.Hint'),
+    scope: 'world', config: true, type: Boolean,
+    default: true, requiresReload: false
+  });
 }
 
 export function getVttUserId() {
@@ -106,4 +114,12 @@ export function isDefaultHiddenTokensEnabled() {
 }
 export function isEmbedClipChromeEnabled() {
   return game.settings.get(MODULE_ID, SETTINGS.EMBED_CLIP_HOST_CHROME);
+}
+export function isAlwaysShowNoteLabelsEnabled() {
+  try {
+    return game.settings.get(MODULE_ID, SETTINGS.ALWAYS_SHOW_NOTE_LABELS);
+  } catch {
+    // Settings not registered yet (early canvasReady before ready hook).
+    return false;
+  }
 }

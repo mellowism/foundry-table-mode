@@ -2,6 +2,17 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.13.0] — 2026-05-05
+
+### Added — Always-show map note labels on VTT (FR5)
+
+The table TV typically has no keyboard, so Foundry's default Alt-hover-to-see-label behaviour is impractical there. New world-scoped setting **"Always show map note labels on VTT"** (default ON) forces every visible map note's label to render persistently on the configured VTT user's client.
+
+- Hooks `drawNote` + `refreshNote` and sets `note.tooltip.visible = true` when the current user is the VTT user and the setting is on.
+- Gated on `note.visible` — hidden notes (no permission for the VTT user) stay hidden; only notes you've toggled visible via the note-HUD eye get a label.
+- GM client is unchanged: Alt-hover still controls labels as before.
+- Toggle the setting off → labels return to default Alt-hover behaviour on the VTT, no reload needed.
+
 ## [0.12.5] — 2026-05-05
 
 ### Changed — Iframe chrome clip is now a settings toggle (replaces v0.12.4 in-frame button)

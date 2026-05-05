@@ -62,5 +62,7 @@
   "TABLE_MODE.EmbedUrl.Reloaded": "Table Mode: TV embed reloaded.",
   "TABLE_MODE.EmbedFrame.DefaultTitle": "Table Mode — Embed",
   "TABLE_MODE.Settings.EmbedClipHostChrome.Name": "Clip host chrome from iframe embeds",
-  "TABLE_MODE.Settings.EmbedClipHostChrome.Hint": "When enabled (default), the iframe embed pulls known hosts (e.g. Homebrewery) up to hide their navbar / scrollbar — clean look on the TV. Disable temporarily when a host MOTD or modal lands inside the clipped region and needs dismissing — turn off, push embed, dismiss the modal, turn back on. Affects iframe embeds only; image embeds are unaffected."
+  "TABLE_MODE.Settings.EmbedClipHostChrome.Hint": "When enabled (default), the iframe embed pulls known hosts (e.g. Homebrewery) up to hide their navbar / scrollbar — clean look on the TV. Disable temporarily when a host MOTD or modal lands inside the clipped region and needs dismissing — turn off, push embed, dismiss the modal, turn back on. Affects iframe embeds only; image embeds are unaffected.",
+  "TABLE_MODE.Settings.AlwaysShowNoteLabels.Name": "Always show map note labels on VTT",
+  "TABLE_MODE.Settings.AlwaysShowNoteLabels.Hint": "When enabled (default), map note labels are always visible on the VTT client — no need to hold Alt. The table TV usually has no keyboard, so Alt-hover is impractical there. Only notes the VTT user has permission to see are affected (use the note-HUD eye to control which notes are visible). GM client is unchanged: Alt-hover still controls labels there."
 }
