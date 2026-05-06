@@ -2,6 +2,26 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.14.0] — 2026-05-06
+
+### Changed — Map note labels on VTT is now a 3-mode setting (replaces v0.13.0 boolean)
+
+The v0.13.0 "Always show" approach worked, but on dense scenes (Frosthold ~80 notes) labels overlapped each other unreadably. Replaced the boolean with a 3-state choice:
+
+- **Off** — Foundry default (Alt-hover only; impractical without a keyboard at the table)
+- **Always show** — every visible note's label persistently shown (the v0.13.0 behavior)
+- **On GM hover** *(new default)* — only the note the GM is currently hovering on the GM laptop gets a label on the VTT. Maximum one label visible at a time. Matches the natural "I'm pointing at this place" gesture and eliminates clutter.
+
+### Implementation — GM-hover broadcast
+
+- GM-side: `Hooks.on('hoverNote', ...)` filters on configured GM + active mode + valid VTT user, then emits a `note.hover` socket message with `{ sceneId, noteId, hovered }`.
+- VTT-side: receives socket, validates scene match, tracks `activeHoverNoteId`, and re-applies label visibility across all notes (only the active id gets `tooltip.visible = true`).
+- Last-write-wins on rapid hover swaps; clearing the same note drops state; scene change clears state on `canvasReady`.
+
+### Migration note
+
+The old setting key `alwaysShowNoteLabels` is gone. New key is `noteLabelsMode` with default `on-gm-hover`. Worlds upgrading from v0.13.0 lose their boolean preference; if you specifically want the v0.13.0 always-on behavior back, switch the new dropdown to **Always show** in module settings.
+
 ## [0.13.0] — 2026-05-05
 
 ### Added — Always-show map note labels on VTT (FR5)

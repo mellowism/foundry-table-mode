@@ -8,7 +8,13 @@ export const SETTINGS = {
   HIDE_GM_CURSOR: 'hideGmCursor',
   DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens',
   EMBED_CLIP_HOST_CHROME: 'embedClipHostChrome',
-  ALWAYS_SHOW_NOTE_LABELS: 'alwaysShowNoteLabels'
+  NOTE_LABELS_MODE: 'noteLabelsMode'
+};
+
+export const NOTE_LABELS_MODES = {
+  OFF: 'off',
+  ALWAYS: 'always',
+  ON_GM_HOVER: 'on-gm-hover'
 };
 
 const ASPECT_PRESETS = {
@@ -85,11 +91,16 @@ export function registerSettings() {
     default: true, requiresReload: false
   });
 
-  game.settings.register(MODULE_ID, SETTINGS.ALWAYS_SHOW_NOTE_LABELS, {
-    name: game.i18n.localize('TABLE_MODE.Settings.AlwaysShowNoteLabels.Name'),
-    hint: game.i18n.localize('TABLE_MODE.Settings.AlwaysShowNoteLabels.Hint'),
-    scope: 'world', config: true, type: Boolean,
-    default: true, requiresReload: false
+  game.settings.register(MODULE_ID, SETTINGS.NOTE_LABELS_MODE, {
+    name: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Hint'),
+    scope: 'world', config: true, type: String,
+    choices: {
+      [NOTE_LABELS_MODES.OFF]: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Choice.Off'),
+      [NOTE_LABELS_MODES.ALWAYS]: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Choice.Always'),
+      [NOTE_LABELS_MODES.ON_GM_HOVER]: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Choice.OnGmHover')
+    },
+    default: NOTE_LABELS_MODES.ON_GM_HOVER, requiresReload: false
   });
 }
 
@@ -115,11 +126,11 @@ export function isDefaultHiddenTokensEnabled() {
 export function isEmbedClipChromeEnabled() {
   return game.settings.get(MODULE_ID, SETTINGS.EMBED_CLIP_HOST_CHROME);
 }
-export function isAlwaysShowNoteLabelsEnabled() {
+export function getNoteLabelsMode() {
   try {
-    return game.settings.get(MODULE_ID, SETTINGS.ALWAYS_SHOW_NOTE_LABELS);
+    return game.settings.get(MODULE_ID, SETTINGS.NOTE_LABELS_MODE);
   } catch {
     // Settings not registered yet (early canvasReady before ready hook).
-    return false;
+    return NOTE_LABELS_MODES.OFF;
   }
 }

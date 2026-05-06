@@ -24,6 +24,8 @@ import { installNoteHud, onCanvasReady as onNoteHudCanvasReady } from './note-hu
 import {
   onDrawNote,
   onRefreshNote,
+  onHoverNote,
+  handleNoteHover,
   reapplyAllNoteLabels,
   onCanvasReady as onNoteLabelsCanvasReady
 } from './note-labels.js';
@@ -57,7 +59,7 @@ import {
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
 const VTT_TOKEN_HIDE_SETTING_KEYS = new Set(['vttUserId']);
-const NOTE_LABELS_SETTING_KEYS = new Set(['alwaysShowNoteLabels', 'vttUserId']);
+const NOTE_LABELS_SETTING_KEYS = new Set(['noteLabelsMode', 'vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -96,6 +98,8 @@ Hooks.once('ready', () => {
           handleEmbedClose(msg); break;
         case MSG.EMBED_RELOAD:
           handleEmbedReload(msg); break;
+        case MSG.NOTE_HOVER:
+          handleNoteHover(msg); break;
       }
     } catch (e) {
       console.error(`[${MODULE_ID}] socket handler error`, e);
@@ -158,9 +162,11 @@ Hooks.on('updateToken', onUpdateToken);
 // Suppress animation for fog-brush + party-marker tokens on user-drag
 Hooks.on('preUpdateToken', onPreUpdateTableModeToken);
 
-// Map note labels — force visible on the VTT client when setting is on
+// Map note labels — force visible on the VTT client per noteLabelsMode setting
 Hooks.on('drawNote', onDrawNote);
 Hooks.on('refreshNote', onRefreshNote);
+// GM-side hover broadcast — drives the on-gm-hover mode
+Hooks.on('hoverNote', onHoverNote);
 
 Hooks.on('canvasReady', () => {
   onViewboxCanvasReady().catch((e) => console.error(`[${MODULE_ID}] canvasReady error`, e));

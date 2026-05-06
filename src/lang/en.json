@@ -63,6 +63,9 @@
   "TABLE_MODE.EmbedFrame.DefaultTitle": "Table Mode — Embed",
   "TABLE_MODE.Settings.EmbedClipHostChrome.Name": "Clip host chrome from iframe embeds",
   "TABLE_MODE.Settings.EmbedClipHostChrome.Hint": "When enabled (default), the iframe embed pulls known hosts (e.g. Homebrewery) up to hide their navbar / scrollbar — clean look on the TV. Disable temporarily when a host MOTD or modal lands inside the clipped region and needs dismissing — turn off, push embed, dismiss the modal, turn back on. Affects iframe embeds only; image embeds are unaffected.",
-  "TABLE_MODE.Settings.AlwaysShowNoteLabels.Name": "Always show map note labels on VTT",
-  "TABLE_MODE.Settings.AlwaysShowNoteLabels.Hint": "When enabled (default), map note labels are always visible on the VTT client — no need to hold Alt. The table TV usually has no keyboard, so Alt-hover is impractical there. Only notes the VTT user has permission to see are affected (use the note-HUD eye to control which notes are visible). GM client is unchanged: Alt-hover still controls labels there."
+  "TABLE_MODE.Settings.NoteLabelsMode.Name": "Map note labels on VTT",
+  "TABLE_MODE.Settings.NoteLabelsMode.Hint": "Controls when map note labels are shown on the VTT client. 'Off' = Foundry default (Alt-hover only — impractical without a keyboard). 'Always' = every visible note's label persistently shown. 'On GM hover' = only the note the GM is currently hovering on the GM laptop is labeled on the VTT — minimal clutter, matches the natural 'pointing at this place' gesture. GM client is unaffected by all three modes (Alt-hover still works there).",
+  "TABLE_MODE.Settings.NoteLabelsMode.Choice.Off": "Off (Alt-hover only)",
+  "TABLE_MODE.Settings.NoteLabelsMode.Choice.Always": "Always show",
+  "TABLE_MODE.Settings.NoteLabelsMode.Choice.OnGmHover": "On GM hover (only the hovered note)"
 }

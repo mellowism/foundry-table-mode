@@ -12,5 +12,6 @@ export const MSG = {
   JOURNAL_STATE: 'journal.state',
   EMBED_OPEN: 'embed.open',
   EMBED_CLOSE: 'embed.close',
-  EMBED_RELOAD: 'embed.reload'
+  EMBED_RELOAD: 'embed.reload',
+  NOTE_HOVER: 'note.hover'
 };
