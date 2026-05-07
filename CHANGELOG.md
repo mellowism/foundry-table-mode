@@ -2,6 +2,24 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.14.1] — 2026-05-07
+
+### Fixed — Hide VTT UI no longer breaks third-party modules rendered inside #ui-* wrappers (B5)
+
+`Hide VTT UI` worked by applying `display: none !important` to Foundry's UI wrapper elements (`#ui-top`, `#ui-middle`, etc.). Combat Tracker Dock (Theripper93's "Carousel Combat Tracker") and similar modules render their DOM as children of those wrappers — so they got hidden along with the wrapper, and on the VTT client the carousel was completely invisible despite working perfectly on the GM laptop.
+
+**Diagnose flow that surfaced this** (Session 260507-golden-clay): combat-dock DOM existed on the VTT client with all combatant data, but its `getBoundingClientRect()` was 0×0 because the `#ui-top` parent had `display: none` from our injected stylesheet. Force-showing `#ui-top` alone wasn't enough — `#ui-middle` was hidden too. After force-showing both, the dock still had height 0 because it had computed its layout while hidden; a single `window.dispatchEvent(new Event('resize'))` triggered re-layout and the carousel finally rendered.
+
+**Fix:** new world-scoped string setting **"Preserve elements on VTT (CSS selectors)"** (default: `#combat-dock`). Comma-separated CSS selectors. After applying the hide stylesheet, we walk up from each preserve-target and force-show every ancestor that's in our hide list, then dispatch a single `resize` event to trigger relayout for any third-party modules that computed sizes while hidden.
+
+**Hooks added:** `combatStart`, `createCombatant`, `deleteCombatant`, `deleteCombat` re-run `applyUiCleanup()` so preserve-aware ancestor unhide picks up combat trackers that only inject DOM when combat starts.
+
+**Add your own preserves:** edit the setting to e.g. `#combat-dock, #my-custom-hud, .some-other-module`. Each becomes a preserve-target whose ancestors stay visible.
+
+### Fixed — `vttUserId` settings-read race at canvasReady (B4 / FR6 regression)
+
+`getVttUserId()` was called by `note-labels.js → isVttUser()` from the `canvasReady` hook, which can fire before settings register at `ready`. Resulted in an uncaught exception in the VTT console: `"foundry-table-mode.vttUserId" is not a registered game setting`. Wrapped `getVttUserId()` in try/catch with safe default `''` (matches the pattern already used by `getNoteLabelsMode()`). Once `ready` fires, settings work normally; the wrapper just suppresses the early-firing exception.
+
 ## [0.14.0] — 2026-05-06
 
 ### Changed — Map note labels on VTT is now a 3-mode setting (replaces v0.13.0 boolean)

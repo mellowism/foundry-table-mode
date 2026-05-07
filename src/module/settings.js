@@ -8,8 +8,11 @@ export const SETTINGS = {
   HIDE_GM_CURSOR: 'hideGmCursor',
   DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens',
   EMBED_CLIP_HOST_CHROME: 'embedClipHostChrome',
-  NOTE_LABELS_MODE: 'noteLabelsMode'
+  NOTE_LABELS_MODE: 'noteLabelsMode',
+  PRESERVE_SELECTORS: 'preserveSelectors'
 };
+
+const DEFAULT_PRESERVE_SELECTORS = '#combat-dock';
 
 export const NOTE_LABELS_MODES = {
   OFF: 'off',
@@ -91,6 +94,13 @@ export function registerSettings() {
     default: true, requiresReload: false
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.PRESERVE_SELECTORS, {
+    name: game.i18n.localize('TABLE_MODE.Settings.PreserveSelectors.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.PreserveSelectors.Hint'),
+    scope: 'world', config: true, type: String,
+    default: DEFAULT_PRESERVE_SELECTORS, requiresReload: false
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.NOTE_LABELS_MODE, {
     name: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Name'),
     hint: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Hint'),
@@ -105,7 +115,24 @@ export function registerSettings() {
 }
 
 export function getVttUserId() {
-  return game.settings.get(MODULE_ID, SETTINGS.VTT_USER_ID);
+  try {
+    return game.settings.get(MODULE_ID, SETTINGS.VTT_USER_ID);
+  } catch {
+    // Settings not registered yet (early canvasReady before ready hook).
+    return '';
+  }
+}
+export function getPreserveSelectors() {
+  let raw;
+  try {
+    raw = game.settings.get(MODULE_ID, SETTINGS.PRESERVE_SELECTORS);
+  } catch {
+    raw = DEFAULT_PRESERVE_SELECTORS;
+  }
+  return String(raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 export function getAnimationDuration() {
   return game.settings.get(MODULE_ID, SETTINGS.ANIMATION_DURATION);

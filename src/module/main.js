@@ -56,7 +56,7 @@ import {
   migrateActorsToFolder
 } from './fog-brush.js';
 
-const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId']);
+const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId', 'preserveSelectors']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
 const VTT_TOKEN_HIDE_SETTING_KEYS = new Set(['vttUserId']);
 const NOTE_LABELS_SETTING_KEYS = new Set(['noteLabelsMode', 'vttUserId']);
@@ -175,6 +175,14 @@ Hooks.on('canvasReady', () => {
   onVttTokenHideCanvasReady();
   onNoteLabelsCanvasReady();
 });
+
+// Combat lifecycle — third-party trackers (e.g. Combat Tracker Dock) often
+// only inject their DOM when combat starts. Re-run cleanup so preserve-aware
+// ancestor unhide can find the new elements.
+Hooks.on('combatStart', applyUiCleanup);
+Hooks.on('createCombatant', applyUiCleanup);
+Hooks.on('deleteCombatant', applyUiCleanup);
+Hooks.on('deleteCombat', applyUiCleanup);
 
 Hooks.on('canvasTearDown', () => {
   onViewboxCanvasTeardown();
