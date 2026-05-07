@@ -71,6 +71,42 @@ function applyPreserveOverrides() {
   return ancestors.size > 0;
 }
 
+let preserveObserver = null;
+
+// Watch for preserve-targets being injected into the DOM after our cleanup
+// pass already ran. Third-party modules (Combat Tracker Dock, etc.) often
+// inject their DOM in their own ready/canvasReady hooks which may fire
+// after ours, so a one-shot pass on canvasReady misses them.
+function ensurePreserveObserver() {
+  if (preserveObserver) return;
+  if (!document.body) return;
+
+  preserveObserver = new MutationObserver((mutations) => {
+    const preserves = getPreserveSelectors();
+    if (preserves.length === 0) return;
+
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        for (const sel of preserves) {
+          let matches = false;
+          try {
+            matches = node.matches?.(sel) || !!node.querySelector?.(sel);
+          } catch {
+            // Invalid selector — skip
+          }
+          if (matches) {
+            applyUiCleanup();
+            return;
+          }
+        }
+      }
+    }
+  });
+
+  preserveObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 export function applyUiCleanup() {
   for (const id of [STYLE_ID, ALWAYS_STYLE_ID]) {
     const existing = document.getElementById(id);
@@ -91,6 +127,10 @@ export function applyUiCleanup() {
   }
 
   if (!isActiveVttUser()) return;
+
+  // Start watching for preserve-targets appearing in DOM after our pass.
+  // Idempotent — only installs once.
+  ensurePreserveObserver();
 
   // Always-on CSS for VTT user
   const alwaysStyle = document.createElement('style');

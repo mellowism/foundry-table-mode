@@ -2,6 +2,16 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.14.3] — 2026-05-07
+
+### Fixed — Combat Tracker Dock still hidden on VTT after world load (v0.14.2 follow-up)
+
+v0.14.2's `canvasReady` re-run wasn't enough — Combat Tracker Dock injects its DOM in its own ready/canvasReady hook which fires *after* ours on the VTT client. Our cleanup ran when `#combat-dock` didn't yet exist, walked up nothing, and ancestors stayed hidden.
+
+**Fix:** added a `MutationObserver` watching `document.body` for any preserve-target appearing. When a matching node is added to the DOM, `applyUiCleanup()` re-runs — this catches third-party modules whose DOM injection timing we can't predict.
+
+Observer is installed lazily on first `applyUiCleanup()` pass when the user is the active VTT user. Idempotent — single observer per session, runs `applyUiCleanup()` synchronously on detection (which itself is idempotent), no debouncing needed because mutations stop firing once the dock is rendered.
+
 ## [0.14.2] — 2026-05-07
 
 ### Fixed — Combat Tracker Dock not rendered when world loads with active combat
