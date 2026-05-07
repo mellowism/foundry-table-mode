@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.14.2] — 2026-05-07
+
+### Fixed — Combat Tracker Dock not rendered when world loads with active combat
+
+v0.14.1's preserve-aware UI cleanup ran on `ready` but Theripper93's Combat Tracker Dock injects its DOM later — after `ready` fires. Walking up from `#combat-dock` found nothing, so ancestors stayed hidden.
+
+Verified live (Session 260507-golden-clay): manually re-running the preserve-walk in console immediately after world load made the carousel appear correctly. The algorithm was right; the call timing was wrong.
+
+**Fix:** added `applyUiCleanup()` to the `canvasReady` hook so the preserve-aware ancestor unhide picks up DOM injected by other modules during canvas redraw. Idempotent — safe to re-run on every canvas change.
+
+`combatStart` / `createCombatant` / `deleteCombatant` / `deleteCombat` hooks added in v0.14.1 still run for the live cases (combat starts mid-session, combatants added/removed). `canvasReady` covers the world-load case.
+
 ## [0.14.1] — 2026-05-07
 
 ### Fixed — Hide VTT UI no longer breaks third-party modules rendered inside #ui-* wrappers (B5)

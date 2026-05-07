@@ -174,6 +174,10 @@ Hooks.on('canvasReady', () => {
   onHideGmCursorCanvasReady();
   onVttTokenHideCanvasReady();
   onNoteLabelsCanvasReady();
+  // Re-run UI cleanup so the preserve-aware ancestor unhide picks up
+  // third-party modules (Combat Tracker Dock, etc.) that inject their DOM
+  // after our `ready` hook fires. Idempotent.
+  applyUiCleanup();
 });
 
 // Combat lifecycle — third-party trackers (e.g. Combat Tracker Dock) often
