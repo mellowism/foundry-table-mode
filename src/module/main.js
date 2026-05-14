@@ -55,11 +55,18 @@ import {
   onPreUpdateTableModeToken,
   migrateActorsToFolder
 } from './fog-brush.js';
+import {
+  onDrawMeasuredTemplate,
+  onRefreshMeasuredTemplate,
+  onCanvasReady as onHideTemplatesCanvasReady,
+  reapplyAll as reapplyHideTemplates
+} from './hide-templates-on-vtt.js';
 
 const UI_SETTING_KEYS = new Set(['hideUi', 'vttUserId', 'preserveSelectors']);
 const GM_CURSOR_SETTING_KEYS = new Set(['hideGmCursor', 'vttUserId']);
 const VTT_TOKEN_HIDE_SETTING_KEYS = new Set(['vttUserId']);
 const NOTE_LABELS_SETTING_KEYS = new Set(['noteLabelsMode', 'vttUserId']);
+const HIDE_TEMPLATES_SETTING_KEYS = new Set(['hideTemplatesOnVtt', 'vttUserId']);
 
 Hooks.once('init', () => {
   console.log(`[${MODULE_ID}] init`);
@@ -118,6 +125,7 @@ Hooks.once('ready', () => {
   // out (settings reads throw before ready). Catch up here.
   reapplyVttTokenHide();
   reapplyAllNoteLabels();
+  reapplyHideTemplates();
 });
 
 Hooks.on('updateSetting', (setting) => {
@@ -129,6 +137,7 @@ Hooks.on('updateSetting', (setting) => {
   if (GM_CURSOR_SETTING_KEYS.has(shortKey)) onHideGmCursorSettingChange();
   if (VTT_TOKEN_HIDE_SETTING_KEYS.has(shortKey)) reapplyVttTokenHide();
   if (NOTE_LABELS_SETTING_KEYS.has(shortKey)) reapplyAllNoteLabels();
+  if (HIDE_TEMPLATES_SETTING_KEYS.has(shortKey)) reapplyHideTemplates();
 });
 
 
@@ -162,6 +171,10 @@ Hooks.on('updateToken', onUpdateToken);
 // Suppress animation for fog-brush + party-marker tokens on user-drag
 Hooks.on('preUpdateToken', onPreUpdateTableModeToken);
 
+// Measured templates — hide on VTT client (spell-targeting overlay)
+Hooks.on('drawMeasuredTemplate', onDrawMeasuredTemplate);
+Hooks.on('refreshMeasuredTemplate', onRefreshMeasuredTemplate);
+
 // Map note labels — force visible on the VTT client per noteLabelsMode setting
 Hooks.on('drawNote', onDrawNote);
 Hooks.on('refreshNote', onRefreshNote);
@@ -174,6 +187,7 @@ Hooks.on('canvasReady', () => {
   onHideGmCursorCanvasReady();
   onVttTokenHideCanvasReady();
   onNoteLabelsCanvasReady();
+  onHideTemplatesCanvasReady();
   // Re-run UI cleanup so the preserve-aware ancestor unhide picks up
   // third-party modules (Combat Tracker Dock, etc.) that inject their DOM
   // after our `ready` hook fires. Idempotent.

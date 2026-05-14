@@ -9,7 +9,8 @@ export const SETTINGS = {
   DEFAULT_HIDDEN_TOKENS: 'defaultHiddenTokens',
   EMBED_CLIP_HOST_CHROME: 'embedClipHostChrome',
   NOTE_LABELS_MODE: 'noteLabelsMode',
-  PRESERVE_SELECTORS: 'preserveSelectors'
+  PRESERVE_SELECTORS: 'preserveSelectors',
+  HIDE_TEMPLATES_ON_VTT: 'hideTemplatesOnVtt'
 };
 
 const DEFAULT_PRESERVE_SELECTORS = '#combat-dock';
@@ -101,6 +102,13 @@ export function registerSettings() {
     default: DEFAULT_PRESERVE_SELECTORS, requiresReload: false
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.HIDE_TEMPLATES_ON_VTT, {
+    name: game.i18n.localize('TABLE_MODE.Settings.HideTemplatesOnVtt.Name'),
+    hint: game.i18n.localize('TABLE_MODE.Settings.HideTemplatesOnVtt.Hint'),
+    scope: 'world', config: true, type: Boolean,
+    default: true, requiresReload: false
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.NOTE_LABELS_MODE, {
     name: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Name'),
     hint: game.i18n.localize('TABLE_MODE.Settings.NoteLabelsMode.Hint'),
@@ -152,6 +160,13 @@ export function isDefaultHiddenTokensEnabled() {
 }
 export function isEmbedClipChromeEnabled() {
   return game.settings.get(MODULE_ID, SETTINGS.EMBED_CLIP_HOST_CHROME);
+}
+export function isHideTemplatesOnVttEnabled() {
+  try {
+    return game.settings.get(MODULE_ID, SETTINGS.HIDE_TEMPLATES_ON_VTT);
+  } catch {
+    return true;
+  }
 }
 export function getNoteLabelsMode() {
   try {

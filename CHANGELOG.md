@@ -2,6 +2,18 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.15.0] — 2026-05-14
+
+### Added — Hide measured templates on VTT (FR)
+
+New world setting `Hide measured templates on VTT` (default ON). Spell-targeting templates (cone, circle, line, ray) — the geometric overlays Foundry draws when a GM places a Burning Hands cone, Fireball circle, etc. — are now suppressed on the VTT client only. GM keeps full visibility on the laptop for aiming and range reference.
+
+**Why:** in in-person table-TV play, the DM-side targeting mesh breaks immersion when it lingers on the players' screen. Animations from AA + JB2A render on a separate PIXI layer, so suppressing the template does NOT suppress the spell animation — the cast spectacle still plays in full on the TV.
+
+**Pattern:** same VTT-side render-suppression pattern as `vtt-token-hide.js` and `hide-gm-cursor.js`. Hooks `drawMeasuredTemplate` + `refreshMeasuredTemplate`, sets `template.visible = false` when on the VTT client. Reapplied on `canvasReady` and `updateSetting` to handle the early-canvasReady-before-ready window.
+
+**Settings reads** wrapped in try/catch with safe default (hide) so the early window doesn't throw.
+
 ## [0.14.3] — 2026-05-07
 
 ### Fixed — Combat Tracker Dock still hidden on VTT after world load (v0.14.2 follow-up)
