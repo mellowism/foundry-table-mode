@@ -30,6 +30,14 @@ function isHideEnabledSafe() {
   }
 }
 
+function getHighlightLayer(template) {
+  const id = template?.highlightId;
+  if (!id) return null;
+  // V13 path moved: canvas.interface.grid.highlightLayers; older fallback retained.
+  const map = canvas?.interface?.grid?.highlightLayers ?? canvas?.grid?.highlightLayers;
+  return map?.[id] ?? null;
+}
+
 export function applyHideForTemplate(template) {
   if (!template) return;
   if (!isThisClientTheVtt()) return;
@@ -38,6 +46,13 @@ export function applyHideForTemplate(template) {
     return;
   }
   template.visible = false;
+  // The grid-highlight layer (the filled purple squares Foundry draws to mark
+  // which cells the template covers) is a separate PIXI object owned by
+  // canvas.grid, not by the template itself. Hide it explicitly — without
+  // this, `template.visible = false` hides only the cone/circle outline and
+  // controlIcon while the grid squares remain visible.
+  const highlight = getHighlightLayer(template);
+  if (highlight) highlight.visible = false;
 }
 
 export function reapplyAll() {

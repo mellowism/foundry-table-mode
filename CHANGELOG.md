@@ -2,6 +2,14 @@
 
 All notable changes to Foundry Table Mode are documented here.
 
+## [0.15.1] — 2026-05-14
+
+### Fixed — Grid-highlight squares still visible on VTT after v0.15.0
+
+v0.15.0 hid the template's own PIXI container (cone/circle outline + controlIcon) but the purple grid-highlight squares Foundry draws to mark covered cells remained visible. The highlight layer is a separate PIXI Graphics owned by `canvas.interface.grid.highlightLayers`, keyed by `template.highlightId` — not a child of the template.
+
+Verified live (Session 260513-silent-elk): VTT-console showed `template.visible: false` correctly but the matching `MeasuredTemplate.{id}` highlight layer was `visible: true`. Two-axis suppression is now applied — template container AND grid-highlight layer.
+
 ## [0.15.0] — 2026-05-14
 
 ### Added — Hide measured templates on VTT (FR)
